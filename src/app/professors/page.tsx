@@ -3,6 +3,7 @@ import Link from "next/link";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import { StatusBadge } from "@/components/status-badge";
+import { Avatar } from "@/components/avatar";
 import { AddProfessorForm } from "./add-professor-form";
 
 export default async function ProfessorsPage() {
@@ -16,7 +17,7 @@ export default async function ProfessorsPage() {
   });
 
   return (
-    <main className="mx-auto w-full max-w-3xl flex-1 px-6 py-12">
+    <main className="page-glow mx-auto w-full max-w-3xl flex-1 px-6 py-12">
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-semibold tracking-tight">Professors</h1>
       </div>
@@ -34,8 +35,9 @@ export default async function ProfessorsPage() {
           </li>
         )}
         {professors.map((p) => (
-          <li key={p.id} className="flex items-center justify-between py-4">
-            <div>
+          <li key={p.id} className="flex items-center gap-3 py-4">
+            <Avatar name={p.name} />
+            <div className="flex-1">
               <Link
                 href={`/professors/${p.id}`}
                 className="font-medium hover:underline"

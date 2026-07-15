@@ -3,18 +3,32 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 
-export function OnboardingForm({ defaultName }: { defaultName: string }) {
+export function ProfileForm({
+  initialSchool,
+  initialDegreeLevel,
+  initialAreaOfStudy,
+  initialBio,
+}: {
+  initialSchool: string;
+  initialDegreeLevel: string;
+  initialAreaOfStudy: string;
+  initialBio: string;
+}) {
   const router = useRouter();
-  const [school, setSchool] = useState("");
-  const [degreeLevel, setDegreeLevel] = useState("9th Grade");
-  const [areaOfStudy, setAreaOfStudy] = useState("");
-  const [bio, setBio] = useState("");
-  const [submitting, setSubmitting] = useState(false);
+  const [school, setSchool] = useState(initialSchool);
+  const [degreeLevel, setDegreeLevel] = useState(
+    initialDegreeLevel || "9th Grade",
+  );
+  const [areaOfStudy, setAreaOfStudy] = useState(initialAreaOfStudy);
+  const [bio, setBio] = useState(initialBio);
+  const [saving, setSaving] = useState(false);
+  const [saved, setSaved] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    setSubmitting(true);
+    setSaving(true);
+    setSaved(false);
     setError(null);
 
     const res = await fetch("/api/onboarding", {
@@ -25,25 +39,24 @@ export function OnboardingForm({ defaultName }: { defaultName: string }) {
 
     if (!res.ok) {
       setError("Something went wrong. Please try again.");
-      setSubmitting(false);
-      return;
+    } else {
+      setSaved(true);
+      router.refresh();
     }
-
-    router.push("/professors");
-    router.refresh();
+    setSaving(false);
   }
 
   return (
-    <form onSubmit={handleSubmit} className="mt-8 flex flex-col gap-5">
-      <input type="hidden" value={defaultName} readOnly />
-
+    <form onSubmit={handleSubmit} className="flex flex-col gap-4">
       <div>
         <label className="block text-sm font-medium">Your high school</label>
         <input
           required
           value={school}
-          onChange={(e) => setSchool(e.target.value)}
-          placeholder="e.g. Lincoln High School"
+          onChange={(e) => {
+            setSchool(e.target.value);
+            setSaved(false);
+          }}
           className="mt-1 w-full rounded-md border border-zinc-300 bg-white px-3 py-2 text-sm focus:border-accent focus:outline-none dark:border-zinc-700 dark:bg-zinc-900"
         />
       </div>
@@ -52,7 +65,10 @@ export function OnboardingForm({ defaultName }: { defaultName: string }) {
         <label className="block text-sm font-medium">Grade level</label>
         <select
           value={degreeLevel}
-          onChange={(e) => setDegreeLevel(e.target.value)}
+          onChange={(e) => {
+            setDegreeLevel(e.target.value);
+            setSaved(false);
+          }}
           className="mt-1 w-full rounded-md border border-zinc-300 bg-white px-3 py-2 text-sm focus:border-accent focus:outline-none dark:border-zinc-700 dark:bg-zinc-900"
         >
           <option>9th Grade</option>
@@ -67,8 +83,10 @@ export function OnboardingForm({ defaultName }: { defaultName: string }) {
         <input
           required
           value={areaOfStudy}
-          onChange={(e) => setAreaOfStudy(e.target.value)}
-          placeholder="e.g. marine biology"
+          onChange={(e) => {
+            setAreaOfStudy(e.target.value);
+            setSaved(false);
+          }}
           className="mt-1 w-full rounded-md border border-zinc-300 bg-white px-3 py-2 text-sm focus:border-accent focus:outline-none dark:border-zinc-700 dark:bg-zinc-900"
         />
       </div>
@@ -77,29 +95,27 @@ export function OnboardingForm({ defaultName }: { defaultName: string }) {
         <label className="block text-sm font-medium">
           Short background blurb
         </label>
-        <p className="mt-1 text-xs text-zinc-500">
-          A sentence or two about relevant classes, clubs, science fair
-          projects, or other experience. This gets dropped into your email
-          drafts.
-        </p>
         <textarea
           required
           rows={4}
           value={bio}
-          onChange={(e) => setBio(e.target.value)}
-          placeholder="I've taken AP Biology and worked on a science fair project involving..."
+          onChange={(e) => {
+            setBio(e.target.value);
+            setSaved(false);
+          }}
           className="mt-1 w-full rounded-md border border-zinc-300 bg-white px-3 py-2 text-sm focus:border-accent focus:outline-none dark:border-zinc-700 dark:bg-zinc-900"
         />
       </div>
 
       {error && <p className="text-sm text-danger">{error}</p>}
+      {saved && <p className="text-sm" style={{ color: "var(--teal)" }}>Saved.</p>}
 
       <button
         type="submit"
-        disabled={submitting}
-        className="mt-2 rounded-full bg-accent px-5 py-2.5 text-sm font-medium text-white transition-colors hover:bg-accent-hover disabled:opacity-50"
+        disabled={saving}
+        className="self-start rounded-full bg-accent px-4 py-2 text-sm font-medium text-white hover:bg-accent-hover disabled:opacity-50"
       >
-        {submitting ? "Saving…" : "Continue"}
+        {saving ? "Saving…" : "Save profile"}
       </button>
     </form>
   );

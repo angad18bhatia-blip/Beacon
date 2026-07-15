@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import type { ProfessorModel } from "@/generated/prisma/models";
 import { StatusBadge } from "@/components/status-badge";
+import { Avatar } from "@/components/avatar";
 
 export function DashboardTable({ professors }: { professors: ProfessorModel[] }) {
   const router = useRouter();
@@ -53,7 +54,7 @@ export function DashboardTable({ professors }: { professors: ProfessorModel[] })
           <button
             onClick={sendAllApproved}
             disabled={bulkBusy}
-            className="rounded-full bg-zinc-900 px-4 py-2 text-sm font-medium text-white hover:bg-zinc-700 disabled:opacity-50 dark:bg-white dark:text-zinc-900 dark:hover:bg-zinc-200"
+            className="rounded-full bg-accent px-4 py-2 text-sm font-medium text-white hover:bg-accent-hover disabled:opacity-50"
           >
             {bulkBusy
               ? "Sending…"
@@ -79,7 +80,11 @@ export function DashboardTable({ professors }: { professors: ProfessorModel[] })
             {professors.map((p) => (
               <tr key={p.id}>
                 <td className="px-4 py-3">
-                  <Link href={`/professors/${p.id}`} className="hover:underline">
+                  <Link
+                    href={`/professors/${p.id}`}
+                    className="flex items-center gap-2 hover:underline"
+                  >
+                    <Avatar name={p.name} />
                     {p.name}
                   </Link>
                 </td>

@@ -1,26 +1,96 @@
 @import "tailwindcss";
 
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  --background: #f4f7fb;
+  --foreground: #0b1220;
+  --accent: #2563eb;
+  --accent-hover: #1d4ed8;
+  --accent-soft: #dbeafe;
+  --accent2: #7c3aed;
+  --accent2-soft: #ede9fe;
+  --pink: #db2777;
+  --pink-soft: #fce7f3;
+  --teal: #0d9488;
+  --teal-soft: #ccfbf1;
+  --amber: #d97706;
+  --amber-soft: #fef3c7;
+  --danger: #dc2626;
+  --danger-hover: #b91c1c;
+  --danger-soft: #fee2e2;
+  --grid-line: rgba(37, 99, 235, 0.08);
 }
 
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
+  --color-accent: var(--accent);
+  --color-accent-hover: var(--accent-hover);
+  --color-accent-soft: var(--accent-soft);
+  --color-accent2: var(--accent2);
+  --color-accent2-soft: var(--accent2-soft);
+  --color-pink: var(--pink);
+  --color-pink-soft: var(--pink-soft);
+  --color-teal: var(--teal);
+  --color-teal-soft: var(--teal-soft);
+  --color-amber: var(--amber);
+  --color-amber-soft: var(--amber-soft);
+  --color-danger: var(--danger);
+  --color-danger-hover: var(--danger-hover);
+  --color-danger-soft: var(--danger-soft);
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
 }
 
 @media (prefers-color-scheme: dark) {
   :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
+    --background: #05070d;
+    --foreground: #e6edf7;
+    --accent: #38bdf8;
+    --accent-hover: #7dd3fc;
+    --accent-soft: rgba(56, 189, 248, 0.16);
+    --accent2: #a78bfa;
+    --accent2-soft: rgba(167, 139, 250, 0.16);
+    --pink: #f472b6;
+    --pink-soft: rgba(244, 114, 182, 0.16);
+    --teal: #2dd4bf;
+    --teal-soft: rgba(45, 212, 191, 0.16);
+    --amber: #fbbf24;
+    --amber-soft: rgba(251, 191, 36, 0.16);
+    --danger: #f87171;
+    --danger-hover: #fca5a5;
+    --danger-soft: rgba(248, 113, 113, 0.16);
+    --grid-line: rgba(56, 189, 248, 0.09);
   }
 }
 
 body {
-  background: var(--background);
+  background:
+    linear-gradient(var(--grid-line) 1px, transparent 1px) 0 0 / 40px 40px,
+    linear-gradient(90deg, var(--grid-line) 1px, transparent 1px) 0 0 / 40px
+      40px,
+    var(--background);
   color: var(--foreground);
   font-family: Arial, Helvetica, sans-serif;
+}
+
+/* Ambient color glow used behind page headers to keep every page feeling
+   alive, not just the landing hero. */
+.page-glow {
+  position: relative;
+}
+.page-glow::before {
+  content: "";
+  position: absolute;
+  inset: -80px -80px auto -80px;
+  height: 320px;
+  z-index: -1;
+  pointer-events: none;
+  background:
+    radial-gradient(40% 60% at 15% 20%, var(--accent-soft), transparent 70%),
+    radial-gradient(35% 55% at 60% 0%, var(--pink-soft), transparent 70%),
+    radial-gradient(30% 50% at 90% 30%, var(--teal-soft), transparent 70%);
+}
+
+::selection {
+  background: var(--accent-soft);
 }

@@ -13,21 +13,54 @@ export default async function DashboardPage() {
     orderBy: { createdAt: "desc" },
   });
 
-  const counts = {
-    NEW: professors.filter((p) => p.status === "NEW").length,
-    DRAFTED: professors.filter((p) => p.status === "DRAFTED").length,
-    APPROVED: professors.filter((p) => p.status === "APPROVED").length,
-    SENT: professors.filter((p) => p.status === "SENT").length,
-  };
+  const tiles = [
+    {
+      label: "New",
+      count: professors.filter((p) => p.status === "NEW").length,
+      color: "--accent2",
+    },
+    {
+      label: "Drafted",
+      count: professors.filter((p) => p.status === "DRAFTED").length,
+      color: "--amber",
+    },
+    {
+      label: "Approved",
+      count: professors.filter((p) => p.status === "APPROVED").length,
+      color: "--accent",
+    },
+    {
+      label: "Sent",
+      count: professors.filter((p) => p.status === "SENT").length,
+      color: "--teal",
+    },
+  ];
 
   return (
-    <main className="mx-auto w-full max-w-4xl flex-1 px-6 py-12">
+    <main className="page-glow mx-auto w-full max-w-4xl flex-1 px-6 py-12">
       <h1 className="text-2xl font-semibold tracking-tight">Dashboard</h1>
-      <div className="mt-4 flex gap-6 text-sm text-zinc-600 dark:text-zinc-400">
-        <span>{counts.NEW} new</span>
-        <span>{counts.DRAFTED} drafted</span>
-        <span>{counts.APPROVED} approved</span>
-        <span>{counts.SENT} sent</span>
+
+      <div className="mt-6 grid grid-cols-2 gap-3 sm:grid-cols-4">
+        {tiles.map((tile) => (
+          <div
+            key={tile.label}
+            className="rounded-lg border p-4"
+            style={{
+              borderColor: `var(${tile.color}-soft)`,
+              background: `var(${tile.color}-soft)`,
+            }}
+          >
+            <p
+              className="text-2xl font-semibold"
+              style={{ color: `var(${tile.color})` }}
+            >
+              {tile.count}
+            </p>
+            <p className="text-xs text-zinc-600 dark:text-zinc-400">
+              {tile.label}
+            </p>
+          </div>
+        ))}
       </div>
 
       <DashboardTable professors={professors} />

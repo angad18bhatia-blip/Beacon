@@ -14,9 +14,9 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Research Outreach",
+  title: "Beacon",
   description:
-    "Reach out to professors about research positions, one honest email at a time.",
+    "Reach out to professors about research opportunities as a high schooler, one honest email at a time.",
 };
 
 export default function RootLayout({
@@ -29,7 +29,7 @@ export default function RootLayout({
       lang="en"
       className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
     >
-      <body className="min-h-full flex flex-col bg-zinc-50 text-zinc-900 dark:bg-black dark:text-zinc-50">
+      <body className="min-h-full flex flex-col bg-background text-foreground">
         <Nav />
         <div className="flex flex-1 flex-col">{children}</div>
       </body>

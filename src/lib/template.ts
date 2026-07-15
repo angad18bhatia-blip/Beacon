@@ -1,13 +1,13 @@
 export const DEFAULT_SUBJECT_TEMPLATE =
-  "Interested in research opportunities in {{research_area}}";
+  "High school student interested in your research on {{research_area}}";
 
 export const DEFAULT_BODY_TEMPLATE = `Dear Professor {{professor_name}},
 
-My name is {{student_name}}, and I am a {{degree_level}} student at {{student_school}} studying {{area_of_study}}. I came across your work on {{research_area}} at {{professor_school}} and wanted to reach out directly.
+My name is {{student_name}}, and I am a {{degree_level}} student at {{student_school}} with a strong interest in {{area_of_study}}. I came across your work on {{research_area}} at {{professor_school}} and wanted to reach out directly.
 
 {{bio}}
 
-I would welcome the opportunity to discuss any potential research openings in your lab. Thank you for your time and consideration.
+I understand you likely can't take on a high schooler as a full research assistant, but I'd be grateful for any way to get involved or learn more, even in a small capacity — shadowing, a short project, or just advice on how to pursue this area further. Thank you for your time and consideration.
 
 Best regards,
 {{student_name}}`;

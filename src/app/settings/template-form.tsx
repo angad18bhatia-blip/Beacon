@@ -47,7 +47,7 @@ export function TemplateForm({
             setSubject(e.target.value);
             setSaved(false);
           }}
-          className="mt-1 w-full rounded-md border border-zinc-300 bg-white px-3 py-2 text-sm dark:border-zinc-700 dark:bg-zinc-900"
+          className="mt-1 w-full rounded-md border border-zinc-300 bg-white px-3 py-2 text-sm focus:border-accent focus:outline-none dark:border-zinc-700 dark:bg-zinc-900"
         />
       </div>
       <div>
@@ -61,17 +61,17 @@ export function TemplateForm({
             setBody(e.target.value);
             setSaved(false);
           }}
-          className="mt-1 w-full rounded-md border border-zinc-300 bg-white px-3 py-2 text-sm dark:border-zinc-700 dark:bg-zinc-900"
+          className="mt-1 w-full rounded-md border border-zinc-300 bg-white px-3 py-2 text-sm focus:border-accent focus:outline-none dark:border-zinc-700 dark:bg-zinc-900"
         />
       </div>
 
-      {error && <p className="text-sm text-red-600">{error}</p>}
-      {saved && <p className="text-sm text-green-600">Saved.</p>}
+      {error && <p className="text-sm text-danger">{error}</p>}
+      {saved && <p className="text-sm" style={{ color: "var(--teal)" }}>Saved.</p>}
 
       <button
         type="submit"
         disabled={saving}
-        className="self-start rounded-full bg-zinc-900 px-4 py-2 text-sm font-medium text-white hover:bg-zinc-700 disabled:opacity-50 dark:bg-white dark:text-zinc-900 dark:hover:bg-zinc-200"
+        className="self-start rounded-full bg-accent px-4 py-2 text-sm font-medium text-white hover:bg-accent-hover disabled:opacity-50"
       >
         {saving ? "Saving…" : "Save template"}
       </button>

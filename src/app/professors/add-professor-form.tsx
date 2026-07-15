@@ -73,7 +73,7 @@ export function AddProfessorForm() {
             value={form.name}
             onChange={(e) => update("name", e.target.value)}
             placeholder="Dr. Jane Smith"
-            className="mt-1 w-full rounded-md border border-zinc-300 bg-white px-3 py-2 text-sm dark:border-zinc-700 dark:bg-zinc-900"
+            className="mt-1 w-full rounded-md border border-zinc-300 bg-white px-3 py-2 text-sm focus:border-accent focus:outline-none dark:border-zinc-700 dark:bg-zinc-900"
           />
         </div>
         <div>
@@ -86,7 +86,7 @@ export function AddProfessorForm() {
             value={form.email}
             onChange={(e) => update("email", e.target.value)}
             placeholder="jsmith@university.edu"
-            className="mt-1 w-full rounded-md border border-zinc-300 bg-white px-3 py-2 text-sm dark:border-zinc-700 dark:bg-zinc-900"
+            className="mt-1 w-full rounded-md border border-zinc-300 bg-white px-3 py-2 text-sm focus:border-accent focus:outline-none dark:border-zinc-700 dark:bg-zinc-900"
           />
         </div>
         <div>
@@ -98,7 +98,7 @@ export function AddProfessorForm() {
             value={form.school}
             onChange={(e) => update("school", e.target.value)}
             placeholder="Stanford University"
-            className="mt-1 w-full rounded-md border border-zinc-300 bg-white px-3 py-2 text-sm dark:border-zinc-700 dark:bg-zinc-900"
+            className="mt-1 w-full rounded-md border border-zinc-300 bg-white px-3 py-2 text-sm focus:border-accent focus:outline-none dark:border-zinc-700 dark:bg-zinc-900"
           />
         </div>
         <div>
@@ -109,7 +109,7 @@ export function AddProfessorForm() {
             value={form.department}
             onChange={(e) => update("department", e.target.value)}
             placeholder="Computer Science"
-            className="mt-1 w-full rounded-md border border-zinc-300 bg-white px-3 py-2 text-sm dark:border-zinc-700 dark:bg-zinc-900"
+            className="mt-1 w-full rounded-md border border-zinc-300 bg-white px-3 py-2 text-sm focus:border-accent focus:outline-none dark:border-zinc-700 dark:bg-zinc-900"
           />
         </div>
         <div className="col-span-2">
@@ -120,7 +120,7 @@ export function AddProfessorForm() {
             value={form.researchArea}
             onChange={(e) => update("researchArea", e.target.value)}
             placeholder="e.g. reinforcement learning for robotics"
-            className="mt-1 w-full rounded-md border border-zinc-300 bg-white px-3 py-2 text-sm dark:border-zinc-700 dark:bg-zinc-900"
+            className="mt-1 w-full rounded-md border border-zinc-300 bg-white px-3 py-2 text-sm focus:border-accent focus:outline-none dark:border-zinc-700 dark:bg-zinc-900"
           />
         </div>
         <div className="col-span-2">
@@ -131,18 +131,18 @@ export function AddProfessorForm() {
             rows={2}
             value={form.notes}
             onChange={(e) => update("notes", e.target.value)}
-            className="mt-1 w-full rounded-md border border-zinc-300 bg-white px-3 py-2 text-sm dark:border-zinc-700 dark:bg-zinc-900"
+            className="mt-1 w-full rounded-md border border-zinc-300 bg-white px-3 py-2 text-sm focus:border-accent focus:outline-none dark:border-zinc-700 dark:bg-zinc-900"
           />
         </div>
       </div>
 
-      {error && <p className="text-sm text-red-600">{error}</p>}
+      {error && <p className="text-sm text-danger">{error}</p>}
 
       <div className="mt-1 flex gap-2">
         <button
           type="submit"
           disabled={submitting}
-          className="rounded-full bg-zinc-900 px-4 py-2 text-sm font-medium text-white hover:bg-zinc-700 disabled:opacity-50 dark:bg-white dark:text-zinc-900 dark:hover:bg-zinc-200"
+          className="rounded-full bg-accent px-4 py-2 text-sm font-medium text-white hover:bg-accent-hover disabled:opacity-50"
         >
           {submitting ? "Adding…" : "Add professor"}
         </button>

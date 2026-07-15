@@ -20,7 +20,7 @@ export default async function ProfessorDetailPage({
   }
 
   return (
-    <main className="mx-auto w-full max-w-2xl flex-1 px-6 py-12">
+    <main className="page-glow mx-auto w-full max-w-2xl flex-1 px-6 py-12">
       <ProfessorDetail professor={professor} studentEmail={session.user.email!} />
     </main>
   );

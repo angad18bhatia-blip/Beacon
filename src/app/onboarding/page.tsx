@@ -8,7 +8,7 @@ export default async function OnboardingPage() {
   if (session.user.onboarded) redirect("/professors");
 
   return (
-    <main className="mx-auto w-full max-w-lg flex-1 px-6 py-16">
+    <main className="page-glow mx-auto w-full max-w-lg flex-1 px-6 py-16">
       <h1 className="text-2xl font-semibold tracking-tight">
         Tell us about yourself
       </h1>

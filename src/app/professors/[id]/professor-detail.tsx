@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import type { ProfessorModel } from "@/generated/prisma/models";
 import { StatusBadge } from "@/components/status-badge";
+import { Avatar } from "@/components/avatar";
 
 export function ProfessorDetail({
   professor,
@@ -118,27 +119,33 @@ export function ProfessorDetail({
       </Link>
 
       <div className="mt-3 flex items-start justify-between">
-        <div>
-          <h1 className="text-2xl font-semibold tracking-tight">
-            {professor.name}
-          </h1>
-          <p className="text-sm text-zinc-500">
-            {professor.email} · {professor.school}
-            {professor.department ? ` · ${professor.department}` : ""}
-          </p>
-          {professor.researchArea && (
-            <p className="mt-1 text-sm text-zinc-500">
-              {professor.researchArea}
+        <div className="flex items-start gap-3">
+          <Avatar name={professor.name} />
+          <div>
+            <h1 className="text-2xl font-semibold tracking-tight">
+              {professor.name}
+            </h1>
+            <p className="text-sm text-zinc-500">
+              {professor.email} · {professor.school}
+              {professor.department ? ` · ${professor.department}` : ""}
             </p>
-          )}
+            {professor.researchArea && (
+              <p className="mt-1 text-sm text-zinc-500">
+                {professor.researchArea}
+              </p>
+            )}
+          </div>
         </div>
         <StatusBadge status={status} />
       </div>
 
       {isSent ? (
-        <div className="mt-8 rounded-lg border border-green-200 bg-green-50 p-4 text-sm text-green-800 dark:border-green-900 dark:bg-green-950 dark:text-green-300">
+        <div
+          className="mt-8 rounded-lg border p-4 text-sm"
+          style={{ borderColor: "var(--teal-soft)", background: "var(--teal-soft)", color: "var(--teal)" }}
+        >
           Sent{sentAt ? ` on ${new Date(sentAt).toLocaleString()}` : ""}.
-          <div className="mt-3 rounded-md border border-green-200 bg-white p-3 dark:border-green-900 dark:bg-black">
+          <div className="mt-3 rounded-md border border-zinc-200 bg-white p-3 dark:border-zinc-800 dark:bg-black">
             <p className="font-medium">{professor.draftSubject}</p>
             <p className="mt-2 whitespace-pre-wrap text-zinc-600 dark:text-zinc-400">
               {professor.draftBody}
@@ -151,7 +158,7 @@ export function ProfessorDetail({
             <button
               onClick={generateDraft}
               disabled={busy !== "idle"}
-              className="rounded-full bg-zinc-900 px-4 py-2 text-sm font-medium text-white hover:bg-zinc-700 disabled:opacity-50 dark:bg-white dark:text-zinc-900 dark:hover:bg-zinc-200"
+              className="rounded-full bg-accent px-4 py-2 text-sm font-medium text-white hover:bg-accent-hover disabled:opacity-50"
             >
               {busy === "generating" ? "Generating…" : "Generate draft"}
             </button>
@@ -164,7 +171,7 @@ export function ProfessorDetail({
                 <input
                   value={subject}
                   onChange={(e) => setSubject(e.target.value)}
-                  className="mt-1 w-full rounded-md border border-zinc-300 bg-white px-3 py-2 text-sm dark:border-zinc-700 dark:bg-zinc-900"
+                  className="mt-1 w-full rounded-md border border-zinc-300 bg-white px-3 py-2 text-sm focus:border-accent focus:outline-none dark:border-zinc-700 dark:bg-zinc-900"
                 />
               </div>
               <div>
@@ -175,11 +182,11 @@ export function ProfessorDetail({
                   rows={14}
                   value={body}
                   onChange={(e) => setBody(e.target.value)}
-                  className="mt-1 w-full rounded-md border border-zinc-300 bg-white px-3 py-2 text-sm dark:border-zinc-700 dark:bg-zinc-900"
+                  className="mt-1 w-full rounded-md border border-zinc-300 bg-white px-3 py-2 text-sm focus:border-accent focus:outline-none dark:border-zinc-700 dark:bg-zinc-900"
                 />
               </div>
 
-              {error && <p className="text-sm text-red-600">{error}</p>}
+              {error && <p className="text-sm text-danger">{error}</p>}
 
               <div className="flex flex-wrap items-center gap-2">
                 <button
@@ -211,7 +218,7 @@ export function ProfessorDetail({
                   title={
                     isDirty ? "Save your changes before sending" : undefined
                   }
-                  className="rounded-full bg-zinc-900 px-4 py-2 text-sm font-medium text-white hover:bg-zinc-700 disabled:opacity-50 dark:bg-white dark:text-zinc-900 dark:hover:bg-zinc-200"
+                  className="rounded-full bg-accent px-4 py-2 text-sm font-medium text-white hover:bg-accent-hover disabled:opacity-50"
                 >
                   {busy === "sending" ? "Sending…" : "Send email"}
                 </button>
@@ -224,7 +231,7 @@ export function ProfessorDetail({
       <button
         onClick={deleteProfessor}
         disabled={busy !== "idle"}
-        className="mt-10 text-sm text-red-600 hover:underline disabled:opacity-50"
+        className="mt-10 text-sm text-danger hover:underline disabled:opacity-50"
       >
         {busy === "deleting" ? "Removing…" : "Remove this professor"}
       </button>
