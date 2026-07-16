@@ -78,6 +78,7 @@ export async function sendProfessorEmail(
         status: "SENT",
         sentAt: new Date(),
         gmailMessageId: sendResult.id ?? null,
+        threadId: sendResult.threadId ?? null,
       },
     }),
     prisma.user.update({

@@ -32,10 +32,22 @@ export async function Nav() {
               Professors
             </Link>
             <Link
+              href="/discover"
+              className="text-zinc-600 hover:text-accent dark:text-zinc-400 dark:hover:text-accent"
+            >
+              Discover
+            </Link>
+            <Link
               href="/dashboard"
               className="text-zinc-600 hover:text-accent dark:text-zinc-400 dark:hover:text-accent"
             >
               Dashboard
+            </Link>
+            <Link
+              href="/stats"
+              className="text-zinc-600 hover:text-accent dark:text-zinc-400 dark:hover:text-accent"
+            >
+              Stats
             </Link>
             <Link
               href="/settings"

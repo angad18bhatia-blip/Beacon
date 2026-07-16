@@ -67,6 +67,10 @@ model User {
   sendCount     Int      @default(0)
   sendCountDate DateTime?
 
+  // Daily rate limit for the AI prompt generator (each call costs money)
+  promptGenCount     Int      @default(0)
+  promptGenCountDate DateTime?
+
   accounts   Account[]
   sessions   Session[]
   professors Professor[]
@@ -98,6 +102,21 @@ model Professor {
   sentAt         DateTime?
   gmailMessageId String?
 
+  // Gmail thread bookkeeping for reply detection
+  threadId     String?
+  hasReply     Boolean   @default(false)
+  replySnippet String?
+  repliedAt    DateTime?
+
+  // Which saved template produced the current draft, snapshotted by name
+  // at generation time (for the stats page — survives template edits/deletes)
+  templateNameUsed String?
+
+  // "manual" (student-entered) or "database" (imported from the
+  // pre-built ResearcherDatabase)
+  source           String  @default("manual")
+  importedFromDbId String?
+
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   createdAt DateTime @default(now())
@@ -111,9 +130,43 @@ model EmailTemplate {
   subject   String
   body      String
   isDefault Boolean @default(true)
+  source    String  @default("manual") // "manual" or "ai_generated"
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+}
+
+// Pre-built, shared (not per-user) database of verified researchers —
+// populated offline by scripts/build-researcher-db.ts, searched for free
+// at request time by the Discover feature so there's no live-query
+// hallucination risk and no per-search API cost.
+model ResearcherDatabase {
+  id                  String   @id @default(cuid())
+  name                String
+  university          String
+  college              String?
+  department           String
+  title                String?
+  fieldOfResearch      String?
+  researchSummary      String?
+  recentProjects       String?
+  email                String?
+  facultyWebsite       String?
+  labWebsite           String?
+  verificationSources  String? // newline-separated source URLs
+
+  // Fit for a high-school student reaching out — carried over from manual
+  // research rather than computed by this app
+  highSchoolFriendliness String?
+  undergradMentoring     String?
+  outreachScore          Int? // 1-10, higher = better fit
+  responseProbability    String? // e.g. "High" / "Medium" / "Low"
+  notes                  String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([university, department])
 }

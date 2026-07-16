@@ -4,7 +4,7 @@ import { prisma } from "@/lib/prisma";
 // Loads the signed-in student's Google account tokens, refreshing the
 // access token via the stored refresh token if it has expired, and
 // persists the refreshed token so we don't have to do this every send.
-async function getGoogleClient(userId: string) {
+export async function getGoogleClient(userId: string) {
   const account = await prisma.account.findFirst({
     where: { userId, provider: "google" },
   });
@@ -99,4 +99,48 @@ export async function sendGmail(opts: {
   });
 
   return res.data;
+}
+
+export type ReplyCheck =
+  | { hasReply: true; snippet: string; repliedAt: Date }
+  | { hasReply: false };
+
+// Reads the thread this app started (via the stored threadId) and checks
+// whether it now contains a message the student didn't send themselves —
+// i.e. a reply. Read-only: never touches, labels, or deletes anything.
+export async function checkForReply(
+  userId: string,
+  studentEmail: string,
+  threadId: string,
+): Promise<ReplyCheck> {
+  const auth = await getGoogleClient(userId);
+  const gmail = google.gmail({ version: "v1", auth });
+
+  const res = await gmail.users.threads.get({
+    userId: "me",
+    id: threadId,
+    format: "metadata",
+    metadataHeaders: ["From", "Date"],
+  });
+
+  const messages = res.data.messages ?? [];
+  const studentAddress = studentEmail.toLowerCase();
+
+  for (const message of messages) {
+    const fromHeader = message.payload?.headers?.find(
+      (h) => h.name?.toLowerCase() === "from",
+    )?.value;
+    if (fromHeader && !fromHeader.toLowerCase().includes(studentAddress)) {
+      const dateHeader = message.payload?.headers?.find(
+        (h) => h.name?.toLowerCase() === "date",
+      )?.value;
+      return {
+        hasReply: true,
+        snippet: message.snippet ?? "",
+        repliedAt: dateHeader ? new Date(dateHeader) : new Date(),
+      };
+    }
+  }
+
+  return { hasReply: false };
 }

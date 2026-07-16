@@ -1,7 +1,8 @@
 import { redirect } from "next/navigation";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
-import { TemplateForm } from "./template-form";
+import { TemplateManager } from "./template-manager";
+import { PromptGenerator } from "./prompt-generator";
 import { ProfileForm } from "./profile-form";
 
 export default async function SettingsPage() {
@@ -14,8 +15,9 @@ export default async function SettingsPage() {
   });
   if (!user) redirect("/");
 
-  const template = await prisma.emailTemplate.findFirst({
+  const templates = await prisma.emailTemplate.findMany({
     where: { userId: session.user.id },
+    orderBy: { createdAt: "asc" },
   });
 
   return (
@@ -51,24 +53,36 @@ export default async function SettingsPage() {
         <h2 className="flex items-center gap-2 text-lg font-semibold tracking-tight">
           <span
             className="inline-block h-2 w-2 rounded-full"
-            style={{ background: "var(--pink)" }}
+            style={{ background: "var(--accent2)" }}
           />
-          Email template
+          Generate a prompt with AI
         </h2>
         <p className="mt-1 text-sm text-zinc-600 dark:text-zinc-400">
-          Edit the default template used when you generate a draft. Available
-          merge fields:{" "}
-          <code className="text-xs">
-            {
-              "{{professor_name}} {{professor_school}} {{research_area}} {{student_name}} {{student_school}} {{area_of_study}} {{degree_level}} {{bio}}"
-            }
-          </code>
+          Describe the tone or angle you want and Claude will draft a new
+          saved prompt for you to review below &mdash; it&apos;s never used
+          to email anyone automatically.
         </p>
         <div className="mt-4">
-          <TemplateForm
-            initialSubject={template?.subject ?? ""}
-            initialBody={template?.body ?? ""}
+          <PromptGenerator />
+        </div>
+      </section>
+
+      <hr className="mt-10 border-zinc-200 dark:border-zinc-800" />
+
+      <section className="mt-8">
+        <h2 className="flex items-center gap-2 text-lg font-semibold tracking-tight">
+          <span
+            className="inline-block h-2 w-2 rounded-full"
+            style={{ background: "var(--pink)" }}
           />
+          Saved prompts
+        </h2>
+        <p className="mt-1 text-sm text-zinc-600 dark:text-zinc-400">
+          Keep several templates around and pick which one to use per
+          professor, or set one as the default.
+        </p>
+        <div className="mt-4">
+          <TemplateManager initialTemplates={templates} />
         </div>
       </section>
     </main>

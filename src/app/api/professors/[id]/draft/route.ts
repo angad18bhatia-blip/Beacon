@@ -4,7 +4,7 @@ import { prisma } from "@/lib/prisma";
 import { renderTemplate } from "@/lib/template";
 
 export async function POST(
-  _req: Request,
+  req: Request,
   { params }: { params: Promise<{ id: string }> },
 ) {
   const session = await auth();
@@ -13,11 +13,11 @@ export async function POST(
   }
 
   const { id } = await params;
+  const { templateId } = await req.json().catch(() => ({ templateId: undefined }));
 
-  const [professor, user, template] = await Promise.all([
+  const [professor, user] = await Promise.all([
     prisma.professor.findUnique({ where: { id } }),
     prisma.user.findUnique({ where: { id: session.user.id } }),
-    prisma.emailTemplate.findFirst({ where: { userId: session.user.id } }),
   ]);
 
   if (!professor || professor.userId !== session.user.id) {
@@ -29,7 +29,14 @@ export async function POST(
       { status: 409 },
     );
   }
-  if (!user || !template) {
+
+  const template = templateId
+    ? await prisma.emailTemplate.findUnique({ where: { id: templateId } })
+    : await prisma.emailTemplate.findFirst({
+        where: { userId: session.user.id, isDefault: true },
+      });
+
+  if (!user || !template || template.userId !== session.user.id) {
     return NextResponse.json(
       { error: "Complete onboarding first" },
       { status: 400 },
@@ -52,7 +59,12 @@ export async function POST(
 
   const updated = await prisma.professor.update({
     where: { id },
-    data: { draftSubject, draftBody, status: "DRAFTED" },
+    data: {
+      draftSubject,
+      draftBody,
+      status: "DRAFTED",
+      templateNameUsed: template.name,
+    },
   });
 
   return NextResponse.json({ professor: updated });

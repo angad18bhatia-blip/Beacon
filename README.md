@@ -10,12 +10,13 @@ blast.
 ## How it works
 
 - **Sign in with Google.** This both logs you in and grants the app
-  permission to send mail *as you* via the Gmail API (`gmail.send` scope).
-  The app never sees or stores your password.
-- **Add professors manually** — name, email, school, department, research
-  area. There's no scraping or auto-search; you bring the list.
-- **Generate a draft** per professor from an editable template, then edit
-  it by hand before approving.
+  permission to send mail *as you* via the Gmail API (`gmail.send` scope),
+  plus read-only inbox access (`gmail.readonly`) used only to detect
+  replies in threads this app started. The app never sees or stores your
+  password.
+- **Add professors manually**, or import from **Discover** (see below).
+- **Generate a draft** per professor from one of your saved prompts, then
+  edit it by hand before approving.
 - **Send** — each send is a distinct, idempotent API call. There's no
   BCC/mass-send; "send all approved" just loops the same single-send path
   professor by professor, and a soft daily cap (40/day) guards against the
@@ -23,6 +24,40 @@ blast.
 - **Edit your profile anytime** — school, grade level, area of interest,
   and bio (used to personalize drafts) can be updated from Settings after
   the initial onboarding, not just once.
+
+### AI features (all optional — the app works fine without any API keys, just with less automation)
+
+- **Discover** searches a *pre-built, shared* database of researchers
+  (`ResearcherDatabase`) instead of asking an AI to search live per query
+  — free and instant to search, no per-query hallucination risk. The
+  database itself is populated offline, once, by
+  `scripts/build-researcher-db.ts` (`npm run db:build-researchers`),
+  which loops over a list of `{university, department}` pairs, does a
+  real Exa web search for each, and asks Claude to extract *only* what's
+  verifiable from those search results (never fabricated, marked
+  `UNKNOWN`/`null` otherwise). Edit the `JOBS` list at the top of that
+  script to control scope — it's intentionally small by default so a
+  first run costs a few dollars, not $100+; already-saved researchers are
+  skipped on re-runs, so it's safe to extend the list and re-run later.
+  Even so, this is AI-assembled data, not hand-verified — the UI reminds
+  you to double-check before contacting anyone.
+- **Saved prompts** (Settings) — keep multiple templates, mark one
+  active, or pick a specific one per professor when generating a draft.
+- **Prompt generator** (Settings) — describe what you want in plain
+  English and Claude drafts a new saved prompt for you to review before
+  saving. Rate-limited (10/day/user) since each call costs money.
+- **"Ground with real research" drafts** (professor detail page) — instead
+  of plain template merge-fields, does a live Exa search on that specific
+  professor and asks Claude to write a draft referencing something real
+  from the results, with source links shown so you can verify them.
+  Shares the same 10/day budget as the prompt generator.
+- **Reply detection** — "Check for reply" (per professor) or "Check for
+  replies" (dashboard, bulk) reads the Gmail thread the app sent and
+  reports whether the professor has responded, with a snippet. On-demand
+  only (no background job/cron in this app).
+- **Stats** page — reply rate per saved prompt, and an overall funnel
+  (New → Drafted → Approved → Sent → Replied). Small sample sizes will be
+  noisy; it's a signal, not a verdict.
 
 ## Local setup
 
@@ -35,7 +70,11 @@ npm install
 ### 2. Create a Google Cloud OAuth client
 
 The app needs its own Google OAuth client to request the `gmail.send`
-scope on your behalf.
+and `gmail.readonly` scopes on your behalf. If you already have a client
+from before reply-detection was added, no changes are needed on the
+Google Cloud side — you'll just be prompted to re-consent (grant the new
+read permission) the next time you sign in, since the scope the app
+requests changed.
 
 1. Go to the [Google Cloud Console](https://console.cloud.google.com/),
    create a project (or pick an existing one).
@@ -59,10 +98,14 @@ already exists) and fill in:
 AUTH_SECRET=        # generate with: npx auth secret
 AUTH_GOOGLE_ID=      # from step 2
 AUTH_GOOGLE_SECRET=  # from step 2
+ANTHROPIC_API_KEY=   # optional — from console.anthropic.com, enables prompt generator + AI-grounded drafts
+EXA_API_KEY=          # optional — from exa.ai, enables the Discover database builder script
 ```
 
 `DATABASE_URL` is already set to a local SQLite file — no extra setup
-needed for local dev.
+needed for local dev. Set a spend limit on both API keys in their
+respective consoles — see "AI features" above for what each one powers
+and its rate limit.
 
 ### 4. Set up the database
 
@@ -88,6 +131,14 @@ on the OAuth consent screen can use the app. This is a real step outside
 of writing code — it's a review process through Google's own console that
 only the project owner can complete. Budget time for it before treating
 this as launch-ready for a wide audience.
+
+`gmail.readonly` (added for reply detection) is in Google's stricter
+**"restricted scope"** tier, not just "sensitive" — going beyond your
+test-user list with this scope requires an annual third-party security
+assessment (real cost, real time), not just the standard verification
+flow. For personal-only use (just your own account as a test user) none
+of this applies; it only matters if you plan to open the app to students
+beyond your test-user allowlist.
 
 ## Deploying to the web
 
@@ -151,7 +202,8 @@ file under `prisma/migrations/`) and push it.
 1. Go to [vercel.com/new](https://vercel.com/new), sign in, and import the
    GitHub repo from step 1.
 2. Under **Environment Variables**, add: `DATABASE_URL` (the Neon
-   connection string), `AUTH_SECRET`, `AUTH_GOOGLE_ID`, `AUTH_GOOGLE_SECRET`
+   connection string), `AUTH_SECRET`, `AUTH_GOOGLE_ID`, `AUTH_GOOGLE_SECRET`,
+   and `ANTHROPIC_API_KEY`/`EXA_API_KEY` if you're using the AI features
    (same values as your local `.env`).
 3. Deploy. Vercel gives you a URL like `https://your-app.vercel.app`.
 

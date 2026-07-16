@@ -2,6 +2,7 @@ import { redirect } from "next/navigation";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import { DashboardTable } from "./dashboard-table";
+import { CheckRepliesButton } from "./check-replies-button";
 
 export default async function DashboardPage() {
   const session = await auth();
@@ -34,13 +35,23 @@ export default async function DashboardPage() {
       count: professors.filter((p) => p.status === "SENT").length,
       color: "--teal",
     },
+    {
+      label: "Replied",
+      count: professors.filter((p) => p.hasReply).length,
+      color: "--accent2",
+    },
   ];
+
+  const sentCount = professors.filter((p) => p.status === "SENT").length;
 
   return (
     <main className="page-glow mx-auto w-full max-w-4xl flex-1 px-6 py-12">
-      <h1 className="text-2xl font-semibold tracking-tight">Dashboard</h1>
+      <div className="flex items-center justify-between">
+        <h1 className="text-2xl font-semibold tracking-tight">Dashboard</h1>
+        {sentCount > 0 && <CheckRepliesButton />}
+      </div>
 
-      <div className="mt-6 grid grid-cols-2 gap-3 sm:grid-cols-4">
+      <div className="mt-6 grid grid-cols-2 gap-3 sm:grid-cols-5">
         {tiles.map((tile) => (
           <div
             key={tile.label}

@@ -53,6 +53,14 @@ export default async function ProfessorsPage() {
               )}
             </div>
             <div className="flex items-center gap-3">
+              {p.hasReply && (
+                <span
+                  className="rounded-full px-2 py-0.5 text-xs font-medium"
+                  style={{ background: "var(--accent2-soft)", color: "var(--accent2)" }}
+                >
+                  Replied
+                </span>
+              )}
               <StatusBadge status={p.status} />
               <Link
                 href={`/professors/${p.id}`}

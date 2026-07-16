@@ -90,7 +90,17 @@ export function DashboardTable({ professors }: { professors: ProfessorModel[] })
                 </td>
                 <td className="px-4 py-3 text-zinc-500">{p.school}</td>
                 <td className="px-4 py-3">
-                  <StatusBadge status={p.status} />
+                  <div className="flex items-center gap-2">
+                    <StatusBadge status={p.status} />
+                    {p.hasReply && (
+                      <span
+                        className="rounded-full px-2 py-0.5 text-xs font-medium"
+                        style={{ background: "var(--accent2-soft)", color: "var(--accent2)" }}
+                      >
+                        Replied
+                      </span>
+                    )}
+                  </div>
                 </td>
                 <td className="px-4 py-3 text-right">
                   {p.status === "APPROVED" && (

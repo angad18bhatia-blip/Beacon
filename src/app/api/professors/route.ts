@@ -22,8 +22,16 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  const { name, email, school, department, researchArea, notes } =
-    await req.json();
+  const {
+    name,
+    email,
+    school,
+    department,
+    researchArea,
+    notes,
+    source,
+    importedFromDbId,
+  } = await req.json();
 
   if (!name || !email || !school) {
     return NextResponse.json(
@@ -41,6 +49,8 @@ export async function POST(req: Request) {
       department: department || null,
       researchArea: researchArea || null,
       notes: notes || null,
+      source: source === "database" ? "database" : "manual",
+      importedFromDbId: source === "database" ? importedFromDbId || null : null,
     },
   });
 
