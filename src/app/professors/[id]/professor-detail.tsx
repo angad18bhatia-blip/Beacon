@@ -7,6 +7,18 @@ import type { ProfessorModel, EmailTemplateModel } from "@/generated/prisma/mode
 import { StatusBadge } from "@/components/status-badge";
 import { Avatar } from "@/components/avatar";
 
+// The server should always return JSON, but a crashed dev-mode request
+// (or a proxy timeout) can come back with an empty body — res.json()
+// throws on that, and without this every busy-state button would get
+// stuck forever since the throw skips the setBusy("idle") below it.
+async function parseJsonSafe(res: Response): Promise<{ error?: string; [key: string]: unknown }> {
+  try {
+    return await res.json();
+  } catch {
+    return {};
+  }
+}
+
 export function ProfessorDetail({
   professor,
   studentEmail,
@@ -53,37 +65,38 @@ export function ProfessorDetail({
     const res = await fetch(`/api/professors/${professor.id}/check-reply`, {
       method: "POST",
     });
-    const data = await res.json();
-    if (!res.ok) {
+    const data = await parseJsonSafe(res);
+    if (!res.ok || !data.professor) {
       setError(data.error ?? "Failed to check for a reply");
       setBusy("idle");
       return;
     }
-    setHasReply(data.professor.hasReply);
-    setReplySnippet(data.professor.replySnippet);
-    setRepliedAt(data.professor.repliedAt);
+    const p = data.professor as ProfessorModel;
+    setHasReply(p.hasReply);
+    setReplySnippet(p.replySnippet);
+    setRepliedAt(p.repliedAt);
     setBusy("idle");
   }
 
   async function generateDraft() {
     setBusy("generating");
     setError(null);
-    setAiSources([]);
     const res = await fetch(`/api/professors/${professor.id}/draft`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ templateId: templateId || undefined }),
     });
-    const data = await res.json();
-    if (!res.ok) {
+    const data = await parseJsonSafe(res);
+    if (!res.ok || !data.professor) {
       setError(data.error ?? "Failed to generate draft");
       setBusy("idle");
       return;
     }
-    setSubject(data.professor.draftSubject ?? "");
-    setBody(data.professor.draftBody ?? "");
-    setStatus(data.professor.status);
-    setTemplateNameUsed(data.professor.templateNameUsed);
+    const p = data.professor as ProfessorModel;
+    setSubject(p.draftSubject ?? "");
+    setBody(p.draftBody ?? "");
+    setStatus(p.status);
+    setTemplateNameUsed(p.templateNameUsed);
     setBusy("idle");
   }
 
@@ -95,17 +108,21 @@ export function ProfessorDetail({
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ templateId: templateId || undefined }),
     });
-    const data = await res.json();
-    if (!res.ok) {
-      setError(data.error ?? "Failed to generate AI draft");
+    const data = await parseJsonSafe(res);
+    if (!res.ok || !data.professor) {
+      setError(
+        data.error ??
+          "Failed to generate AI draft — the AI service may be slow or unreachable right now. Please try again.",
+      );
       setBusy("idle");
       return;
     }
-    setSubject(data.professor.draftSubject ?? "");
-    setBody(data.professor.draftBody ?? "");
-    setStatus(data.professor.status);
-    setTemplateNameUsed(data.professor.templateNameUsed);
-    setAiSources(data.sources ?? []);
+    const p = data.professor as ProfessorModel;
+    setSubject(p.draftSubject ?? "");
+    setBody(p.draftBody ?? "");
+    setStatus(p.status);
+    setTemplateNameUsed(p.templateNameUsed);
+    setAiSources((data.sources as string[]) ?? []);
     setBusy("idle");
   }
 
@@ -121,13 +138,13 @@ export function ProfessorDetail({
         ...(nextStatus ? { status: nextStatus } : {}),
       }),
     });
-    const data = await res.json();
-    if (!res.ok) {
+    const data = await parseJsonSafe(res);
+    if (!res.ok || !data.professor) {
       setError(data.error ?? "Failed to save");
       setBusy("idle");
       return;
     }
-    setStatus(data.professor.status);
+    setStatus((data.professor as ProfessorModel).status);
     setBusy("idle");
     router.refresh();
   }
@@ -145,14 +162,14 @@ export function ProfessorDetail({
     const res = await fetch(`/api/professors/${professor.id}/send`, {
       method: "POST",
     });
-    const data = await res.json();
-    if (!res.ok) {
+    const data = await parseJsonSafe(res);
+    if (!res.ok || !data.professor) {
       setError(data.error ?? "Failed to send");
       setBusy("idle");
       return;
     }
     setStatus("SENT");
-    setSentAt(data.professor.sentAt);
+    setSentAt((data.professor as ProfessorModel).sentAt);
     setBusy("idle");
     router.refresh();
   }
@@ -268,28 +285,34 @@ export function ProfessorDetail({
           )}
 
           {!subject && !body ? (
-            <div className="flex flex-wrap gap-2">
-              <button
-                onClick={generateDraft}
-                disabled={busyAtAll}
-                className="rounded-full bg-accent px-4 py-2 text-sm font-medium text-white hover:bg-accent-hover disabled:opacity-50"
-              >
-                {busy === "generating" ? "Generating…" : "Generate draft"}
-              </button>
-              <button
-                onClick={generateAIDraft}
-                disabled={busyAtAll}
-                className="rounded-full px-4 py-2 text-sm font-medium text-white disabled:opacity-50"
-                style={{
-                  backgroundImage:
-                    "linear-gradient(90deg, var(--accent), var(--accent2))",
-                }}
-                title="Uses a real web search to ground the email in this professor's actual research"
-              >
-                {busy === "ai-generating"
-                  ? "Researching…"
-                  : "✨ Ground with real research (AI)"}
-              </button>
+            <div>
+              <div className="flex flex-wrap gap-2">
+                <button
+                  onClick={generateDraft}
+                  disabled={busyAtAll}
+                  className="rounded-full bg-accent px-4 py-2 text-sm font-medium text-white hover:bg-accent-hover disabled:opacity-50"
+                >
+                  {busy === "generating" ? "Generating…" : "Generate draft"}
+                </button>
+                <button
+                  onClick={generateAIDraft}
+                  disabled={busyAtAll}
+                  className="rounded-full px-4 py-2 text-sm font-medium text-white disabled:opacity-50"
+                  style={{
+                    backgroundImage:
+                      "linear-gradient(90deg, var(--accent), var(--accent2))",
+                  }}
+                  title="Uses Discover's data on this professor if we have it, otherwise a live web search, to ground the email in their actual research"
+                >
+                  {busy === "ai-generating"
+                    ? "Researching…"
+                    : "✨ Ground with real research (AI)"}
+                </button>
+              </div>
+              <p className="mt-2 text-xs text-zinc-500">
+                &ldquo;Ground with real research&rdquo; makes a live AI call, so
+                it can take up to a minute — unlike the instant template draft.
+              </p>
             </div>
           ) : (
             <div className="flex flex-col gap-4">
@@ -383,6 +406,12 @@ export function ProfessorDetail({
                   {busy === "sending" ? "Sending…" : "Send email"}
                 </button>
               </div>
+              {busy === "ai-generating" && (
+                <p className="text-xs text-zinc-500">
+                  Grounding with real research can take up to a minute —
+                  it&apos;s a live AI call, not instant like the template.
+                </p>
+              )}
             </div>
           )}
         </div>

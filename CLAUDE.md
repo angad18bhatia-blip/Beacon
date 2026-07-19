@@ -12,8 +12,8 @@ conventions, and heed deprecation notices.
 
 ## What this is
 
-Beacon: a Next.js app for high school students to reach out to professors
-about research opportunities. A student signs in with Google, adds
+Beacon: a Next.js app for high school and college students to reach out to
+professors about research opportunities. A student signs in with Google, adds
 professors (manually or via Discover), generates a personalized draft per
 professor from a saved prompt/template, reviews/edits it, then sends it
 from their own Gmail account — one email per professor, never a
@@ -30,7 +30,7 @@ npm run lint                     # eslint (flat config via eslint.config.mjs)
 npx tsc --noEmit -p tsconfig.json       # typecheck only, no test suite exists
 npx prisma migrate dev --name <x>       # create + apply a migration after schema.prisma changes
 npx prisma studio                        # browse the local sqlite db
-npm run db:build-researchers    # AI-populates ResearcherDatabase via Exa+Claude (needs both API keys, costs money — see README)
+npm run db:build-researchers    # AI-populates ResearcherDatabase via Exa+NVIDIA Nemotron (needs both API keys, both free — see README)
 npx tsx scripts/seed-researchers.ts     # one-off: hand-written/manually-verified researcher entries, no API calls
 ```
 
@@ -64,9 +64,10 @@ There is no test suite in this repo — verification is `tsc` + `eslint` +
 
 **Stack**: Next.js 16 (App Router, Turbopack) + TypeScript + Tailwind CSS
 v4 + Prisma 6 (SQLite locally, swap to Postgres for prod — see README) +
-Auth.js v5 (`next-auth@beta`) + `googleapis` for Gmail + `@anthropic-ai/sdk`
-for Claude + Exa's REST search API (via plain `fetch`, no SDK) for web
-search.
+Auth.js v5 (`next-auth@beta`) + `googleapis` for Gmail + NVIDIA's free NIM
+API (`src/lib/nvidia.ts`, via plain `fetch`, no SDK — OpenAI-compatible
+chat completions at `https://integrate.api.nvidia.com/v1`) for LLM calls
++ Exa's REST search API (via plain `fetch`, no SDK) for web search.
 
 ### Auth is also the mail-sending *and* inbox-reading credential
 
@@ -95,10 +96,31 @@ the bulk route (`/api/professors/send-all`) call this same function.
 
 Reply checking is **on-demand only** — `POST /api/professors/[id]/check-reply`
 (single) and `POST /api/professors/check-replies` (bulk, loops every
-`SENT` professor with a `threadId`) — there is no cron/background job/
-webhook in this app. Both routes detect a Gmail permission error (thrown
-when an account signed in before this scope existed hasn't re-consented)
-and surface a "sign out and back in" message rather than a raw error.
+`SENT` professor with a `threadId`, used by the dashboard's "Check for
+replies" button) — there is no cron/background job/webhook in this app.
+Both routes detect a Gmail permission error (thrown when an account
+signed in before this scope existed hasn't re-consented) and surface a
+"sign out and back in" message rather than a raw error. (A notification
+bell that auto-triggered this on every page load was built and then
+removed — see git history if reviving it.)
+
+### Dashboard tiles drill into a filtered professor list
+
+`/dashboard` used to be split from `/stats` — same funnel tiles (New /
+Drafted / Approved / Sent / Replied) computed from the same `Professor`
+query, just rendered on two separate pages. They were merged into one
+`/dashboard` page since the duplication wasn't earning its keep; `/stats`
+now just `redirect()`s to `/dashboard` so old links don't 404. The status
+tiles are links, not just numbers — clicking one goes to
+`/professors?status=<STATUS>` or `/professors?replied=1`, which
+`src/app/professors/page.tsx` reads to filter the same list view down to
+just that group (with a "Clear filter" link back to the unfiltered list).
+
+Below the tiles, `/dashboard` also groups `Professor` rows by
+`templateNameUsed` among `status: SENT` ones, computing sent/replied/
+reply-rate per saved prompt ("Which prompts are working") — this and the
+send-actions table (`dashboard-table.tsx`) are the two things that used
+to live on the separate `/stats` page. Pure read/aggregate, no new state.
 
 ### Prisma client generation is non-standard
 
@@ -127,12 +149,28 @@ mutations live behind:
   request body or the user's active (`isDefault: true`) `EmailTemplate`;
   snapshots the template's *name* onto `Professor.templateNameUsed` (used
   by the stats page — survives the template later being edited/deleted).
-- `POST /api/professors/[id]/draft-ai` — the "grounded" alternative: runs
-  an Exa search on the specific professor, feeds the results + the
-  chosen template's tone into Claude, asks for a draft that cites
-  something real (never fabricated) with source URLs returned to the
-  client. Shares the same daily budget/counter as the prompt generator
-  (`User.promptGenCount`).
+- `POST /api/professors/[id]/draft-ai` — the "grounded" alternative,
+  writes an actual finished email (no merge-field placeholders) instead
+  of filling a template. Tries two sources of "verified context about
+  the professor," in order, and uses whichever it finds first:
+  1. If the professor was imported from Discover (`Professor.importedFromDbId`
+     set) and that `ResearcherDatabase` row has `researchSummary` or
+     `recentProjects`, use that directly — free, instant, no live call.
+  2. Otherwise, a live Exa search (`${name} ${school} research`). Needs
+     `EXA_API_KEY`.
+  Either way, the context + the chosen template's tone go to NVIDIA's
+  `nvidia/llama-3.3-nemotron-super-49b-v1` (same "never fabricate, keep
+  it general instead of guessing" instruction pattern as the Discover
+  builder) which returns the finished subject/body plus the source
+  URLs it drew on (shown in the UI so the student can double-check them).
+  Sets `Professor.templateNameUsed` to `"<template name> (AI-grounded)"`
+  so `/dashboard`'s per-prompt table can compare grounded vs.
+  template-only reply rates as separate rows. Rate-limited independently
+  of the prompt generator via
+  `User.aiDraftCount`/`aiDraftCountDate` (10/day) — kept separate from
+  `promptGenCount` (3/day) since drafting several professors in one
+  sitting is a normal use pattern that shouldn't eat into the prompt
+  generator's budget.
 - `PATCH /api/professors/[id]` — edits fields/draft text; refuses to set
   `status: SENT` (only reachable through `/send`) and refuses edits once
   `SENT`.
@@ -143,6 +181,12 @@ component owning generate / AI-generate / edit / approve / send / delete
 / check-reply for a single professor — intentionally not split further
 since the state is tightly coupled.
 
+Note: the Settings "generate a saved prompt with AI" flow
+(`/api/templates/generate`) and the AI-grounded draft mode above were
+both removed earlier (cost/complexity, when the only option was the paid
+Anthropic API), then brought back once AI calls moved to NVIDIA's free
+API — see "AI features now run on NVIDIA's free API" below.
+
 ### Multiple saved prompts, not one template
 
 `EmailTemplate` supports many rows per user; exactly one has
@@ -151,12 +195,9 @@ and `/api/templates/[id]` (PATCH supports a `setActive: true` body flag
 that atomically flips every other template's `isDefault` off in a
 transaction; DELETE refuses to drop the last remaining template and
 auto-promotes another to active if the deleted one was active).
-`src/app/settings/template-manager.tsx` is the CRUD UI;
-`src/app/settings/prompt-generator.tsx` is the "describe it, Claude
-writes it" flow (`POST /api/templates/generate`, rate-limited, returns a
-draft for review — nothing is saved until the user clicks Save). Every
-generate/draft-ai call in `professor-detail.tsx` lets the user pick which
-saved template to use via a `<select>`.
+`src/app/settings/template-manager.tsx` is the CRUD UI. The generate call
+in `professor-detail.tsx` lets the user pick which saved template to use
+via a `<select>`.
 
 ### Onboarding fields double as both first-run and editable profile
 
@@ -167,32 +208,57 @@ onboarding form and the "edit anytime" profile form in Settings
 `/onboarding` redirects there if `!session.user.onboarded`, and to `/` if
 unauthenticated.
 
+`degreeLevel` is a free-text `User` column but both forms constrain it to
+a fixed `<select>` list — high school (`"9th Grader"` … `"12th Grader"`)
+and college (`"College Freshman"` … `"College Senior"`) in two
+`<optgroup>`s. `src/lib/template.ts`'s `getCapabilityNote()` pattern-matches
+on that exact label format (`/grader$/i` = high school, anything else =
+college) to pick which version of the "what I'm asking for" sentence goes
+into the `{{capability_note}}` merge field — a high schooler asks to
+shadow/learn in a small capacity, a college student is told it's
+reasonable to ask about actual RA positions. This is the one piece of
+template content that adapts to degree level; if the option label format
+ever changes, that regex needs to change with it. The same note (computed
+fresh, not the raw template) is injected into the AI-grounded draft
+prompt (`draft-ai/route.ts`) too, so both drafting paths adapt.
+
 ### Discover: a pre-built shared database, not live search
 
 `ResearcherDatabase` is a **shared, not per-user** table. The whole point
-is that searching it (`/discover`, plain Prisma `contains` filters) is
-free and has no live hallucination risk, unlike the original (removed,
-then rebuilt) design where each user query hit an LLM directly. It gets
-populated two ways:
+is that searching it (`/discover`) is free and has no live hallucination
+risk, unlike the original (removed, then rebuilt) design where each user
+query hit an LLM directly. The search box matches across name,
+university, department, `fieldOfResearch`, and `researchSummary` (an
+`OR` of `contains` filters, built once in `src/lib/discover-search.ts`
+and shared by the page and `/api/discover` so the two can't drift) — an
+earlier version searched `fieldOfResearch` only, which made obvious
+queries like a university name return nothing. Results are paginated 15
+at a time (`DISCOVER_PAGE_SIZE`); `discover-results.tsx` is a client
+component that starts from the server-rendered first page and appends
+more via `GET /api/discover?q=...&skip=...` when "Show more" is clicked.
+It gets populated two ways:
 - `scripts/build-researcher-db.ts` (`npm run db:build-researchers`) —
   loops a hardcoded `JOBS` list of `{university, department}` pairs
-  (intentionally small/pilot-scoped — edit the list to expand), does a
-  real Exa search per department, then asks Claude to extract *only*
-  what's verifiable from those specific search results (never fabricate;
-  `null`/`"UNKNOWN"` otherwise) as JSON, and upserts. Needs both
-  `ANTHROPIC_API_KEY` and `EXA_API_KEY`.
+  (deliberately spread across fields — CS, Biology, Physics, Chemistry,
+  Math, Psychology, Aerospace, Astronomy, Neuroscience, etc. — and
+  several universities, not just MIT/Stanford, so Discover isn't
+  CS/Bio-only; edit the list to expand further), does a real Exa search
+  per department, then asks NVIDIA's free
+  `llama-3.3-nemotron-super-49b-v1` to extract *only* what's verifiable
+  from those specific search results (never fabricate; `null`/`"UNKNOWN"`
+  otherwise) as JSON, and upserts. Needs both `NVIDIA_NEMOTRON_API_KEY`
+  and `EXA_API_KEY`.
 - `scripts/seed-researchers.ts` — a one-off hand-editable list for
   manually-verified entries (e.g. researched by the user directly, or via
-  a separate chat) with **no API calls at all**. This is how the current
-  12 seeded entries got in. Both scripts skip a row if a
-  `(name, university, department)` match already exists, so re-running
-  is always safe.
+  a separate chat) with **no API calls at all**. Both scripts skip a row
+  if a `(name, university, department)` match already exists, so
+  re-running either is always safe.
 
 `ResearcherDatabase` also carries optional "fit for a high schooler"
 fields that aren't computed by this app — `title`, `recentProjects`,
 `highSchoolFriendliness`, `undergradMentoring`, `outreachScore` (1-10),
 `responseProbability`, `notes` — populated only when the source data
-included them (Claude output from the builder script generally won't;
+included them (the builder script's model output generally won't;
 manually-researched entries like the current seed data often do).
 `src/app/discover/discover-results.tsx` renders these as badges when
 present.
@@ -200,17 +266,12 @@ present.
 Importing a result into a user's own `Professor` list
 (`source: "database"`, `importedFromDbId` set) still requires the row to
 have a non-null `email` — no email means the checkbox is disabled, can't
-be imported. A permanent (not one-time-dismissed) banner on `/discover`
+be imported (the UI nudges the student to go find one themselves rather
+than just saying import failed). A permanent (not one-time-dismissed)
+banner on `/discover`
 reminds the student to verify before contacting, since "AI-assembled" and
 "AI-generated draft, unreviewed" and "hand-verified" are all different
 things and this database is a mix.
-
-### Stats
-
-`/stats` groups `Professor` rows by `templateNameUsed` among `status:
-SENT` ones, computing sent/replied/reply-rate per saved prompt, plus an
-overall New→Drafted→Approved→Sent→Replied funnel. Pure read/aggregate,
-no new state.
 
 ### Theming
 
@@ -231,14 +292,25 @@ pages use it.
 
 Not architecture, just where things stand — check `git log` / `.env` for
 ground truth if this goes stale:
-- `EXA_API_KEY` is configured; `ANTHROPIC_API_KEY` is deliberately **not**
-  set (user's choice, to avoid cost) — so the prompt generator, AI-grounded
-  drafts, and `npm run db:build-researchers` are all live-but-inert until
-  a key is added. Nothing breaks; each route checks for the key and
-  returns a clear "not configured" error.
-- `ResearcherDatabase` currently has 12 hand-verified entries (seeded via
-  `scripts/seed-researchers.ts`, editing that file's `ENTRIES` array is
-  the pattern for adding more without API calls).
-- The user's own `Professor` list is empty at the moment (test data was
-  cleaned up).
+- All three AI-adjacent keys are configured and live: `EXA_API_KEY`,
+  `NVIDIA_NEMOTRON_API_KEY` (Discover builder + AI-grounded drafts), and
+  `NVIDIA_LLAMA_API_KEY` (prompt generator) — all three are free-tier
+  keys from build.nvidia.com / exa.ai, not paid, so there's no cost
+  gating to worry about here unlike the old Anthropic setup. All three
+  AI features (Discover builder, prompt generator, AI-grounded drafting)
+  are now live and have been used for real, not just built-but-inert.
+- `ResearcherDatabase` currently has 66 entries across 12 universities
+  (50 with a real email on file): the hand-verified ones from
+  `scripts/seed-researchers.ts` (editing that file's `ENTRIES` array is
+  the pattern for adding more without API calls) plus two
+  `npm run db:build-researchers` runs — the original small MIT/Stanford
+  CS+Biology `JOBS` list, then an expanded one spanning Physics,
+  Chemistry, Math, Psychology, Aerospace, Astronomy, and Neuroscience
+  across MIT, Stanford, Berkeley, Caltech, Michigan, Georgia Tech,
+  Princeton, Harvard, and UCLA. Two department jobs (Princeton Math,
+  Cornell Astronomy) extracted 0 researchers on that run — Nemotron
+  correctly abstained rather than fabricating when its search results
+  weren't rich enough, not a bug.
+- The user's own `Professor` list has real (not just test) outreach data
+  in it now, including at least one sent email with a detected reply.
 - Google OAuth: personal test-user only, not submitted for verification.

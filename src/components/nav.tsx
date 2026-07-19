@@ -44,12 +44,6 @@ export async function Nav() {
               Dashboard
             </Link>
             <Link
-              href="/stats"
-              className="text-zinc-600 hover:text-accent dark:text-zinc-400 dark:hover:text-accent"
-            >
-              Stats
-            </Link>
-            <Link
               href="/settings"
               className="text-zinc-600 hover:text-accent dark:text-zinc-400 dark:hover:text-accent"
             >

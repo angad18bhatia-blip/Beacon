@@ -7,10 +7,10 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
+    "postinstall": "prisma generate",
     "db:build-researchers": "tsx scripts/build-researcher-db.ts"
   },
   "dependencies": {
-    "@anthropic-ai/sdk": "^0.112.0",
     "@auth/prisma-adapter": "^2.11.2",
     "@prisma/client": "^6.19.3",
     "googleapis": "^173.0.0",
@@ -38,7 +38,6 @@
     "prisma@6.19.3": true,
     "sharp@0.34.5": true,
     "unrs-resolver@1.12.2": true,
-    "@anthropic-ai/sdk@0.112.0": true,
     "esbuild@0.28.1": true
   }
 }

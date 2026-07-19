@@ -35,6 +35,33 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
       return session;
     },
   },
+  events: {
+    // Auth.js only calls the adapter's linkAccount() the *first* time a
+    // Google account is linked — signing in again with an already-linked
+    // account (e.g. to grant a newly-added scope like gmail.readonly) skips
+    // it entirely, so the stored access/refresh token and scope go stale
+    // forever. `account` here is the fresh token set straight from Google
+    // (not the stale DB row), so persist it on every sign-in.
+    async signIn({ account }) {
+      if (account?.provider !== "google") return;
+      await prisma.account.update({
+        where: {
+          provider_providerAccountId: {
+            provider: account.provider,
+            providerAccountId: account.providerAccountId,
+          },
+        },
+        data: {
+          access_token: account.access_token,
+          refresh_token: account.refresh_token,
+          expires_at: account.expires_at,
+          scope: account.scope,
+          token_type: account.token_type,
+          id_token: account.id_token,
+        },
+      });
+    },
+  },
   pages: {
     signIn: "/",
   },

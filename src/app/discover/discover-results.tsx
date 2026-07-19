@@ -5,13 +5,19 @@ import { useRouter } from "next/navigation";
 import type { ResearcherDatabaseModel } from "@/generated/prisma/models";
 
 export function DiscoverResults({
-  results,
+  initialResults,
+  totalMatching,
+  query,
 }: {
-  results: ResearcherDatabaseModel[];
+  initialResults: ResearcherDatabaseModel[];
+  totalMatching: number;
+  query: string;
 }) {
   const router = useRouter();
+  const [results, setResults] = useState(initialResults);
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [importing, setImporting] = useState(false);
+  const [loadingMore, setLoadingMore] = useState(false);
 
   function toggle(id: string) {
     setSelected((prev) => {
@@ -46,9 +52,21 @@ export function DiscoverResults({
     router.refresh();
   }
 
+  async function loadMore() {
+    setLoadingMore(true);
+    const params = new URLSearchParams({ q: query, skip: String(results.length) });
+    const res = await fetch(`/api/discover?${params.toString()}`);
+    if (res.ok) {
+      const data = await res.json();
+      setResults((prev) => [...prev, ...(data.results ?? [])]);
+    }
+    setLoadingMore(false);
+  }
+
   if (results.length === 0) return null;
 
   const selectableCount = results.filter((r) => r.email && selected.has(r.id)).length;
+  const hasMore = results.length < totalMatching;
 
   return (
     <div className="flex flex-col gap-4">
@@ -115,8 +133,9 @@ export function DiscoverResults({
                 {r.email ? (
                   r.email
                 ) : (
-                  <span className="text-danger">
-                    No email on file — can&apos;t import automatically
+                  <span className="text-amber">
+                    No email found yet — try a quick search for their name to
+                    find one on their faculty page.
                   </span>
                 )}
               </p>
@@ -147,15 +166,26 @@ export function DiscoverResults({
         ))}
       </ul>
 
-      {results.some((r) => r.email) && (
-        <button
-          onClick={handleImport}
-          disabled={selectableCount === 0 || importing}
-          className="self-start rounded-full bg-accent px-5 py-2.5 text-sm font-medium text-white hover:bg-accent-hover disabled:opacity-50"
-        >
-          {importing ? "Adding…" : `Add ${selectableCount || ""} selected to my professors`}
-        </button>
-      )}
+      <div className="flex flex-wrap items-center gap-3">
+        {results.some((r) => r.email) && (
+          <button
+            onClick={handleImport}
+            disabled={selectableCount === 0 || importing}
+            className="rounded-full bg-accent px-5 py-2.5 text-sm font-medium text-white hover:bg-accent-hover disabled:opacity-50"
+          >
+            {importing ? "Adding…" : `Add ${selectableCount || ""} selected to my professors`}
+          </button>
+        )}
+        {hasMore && (
+          <button
+            onClick={loadMore}
+            disabled={loadingMore}
+            className="rounded-full border border-zinc-300 px-5 py-2.5 text-sm font-medium hover:bg-zinc-100 disabled:opacity-50 dark:border-zinc-700 dark:hover:bg-zinc-900"
+          >
+            {loadingMore ? "Loading…" : "Show more"}
+          </button>
+        )}
+      </div>
     </div>
   );
 }

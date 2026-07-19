@@ -6,7 +6,7 @@ import { useRouter } from "next/navigation";
 export function OnboardingForm({ defaultName }: { defaultName: string }) {
   const router = useRouter();
   const [school, setSchool] = useState("");
-  const [degreeLevel, setDegreeLevel] = useState("9th Grade");
+  const [degreeLevel, setDegreeLevel] = useState("9th Grader");
   const [areaOfStudy, setAreaOfStudy] = useState("");
   const [bio, setBio] = useState("");
   const [submitting, setSubmitting] = useState(false);
@@ -38,27 +38,35 @@ export function OnboardingForm({ defaultName }: { defaultName: string }) {
       <input type="hidden" value={defaultName} readOnly />
 
       <div>
-        <label className="block text-sm font-medium">Your high school</label>
+        <label className="block text-sm font-medium">Your school</label>
         <input
           required
           value={school}
           onChange={(e) => setSchool(e.target.value)}
-          placeholder="e.g. Lincoln High School"
+          placeholder="e.g. Lincoln High School or UC Berkeley"
           className="mt-1 w-full rounded-md border border-zinc-300 bg-white px-3 py-2 text-sm focus:border-accent focus:outline-none dark:border-zinc-700 dark:bg-zinc-900"
         />
       </div>
 
       <div>
-        <label className="block text-sm font-medium">Grade level</label>
+        <label className="block text-sm font-medium">Grade / year level</label>
         <select
           value={degreeLevel}
           onChange={(e) => setDegreeLevel(e.target.value)}
           className="mt-1 w-full rounded-md border border-zinc-300 bg-white px-3 py-2 text-sm focus:border-accent focus:outline-none dark:border-zinc-700 dark:bg-zinc-900"
         >
-          <option>9th Grade</option>
-          <option>10th Grade</option>
-          <option>11th Grade</option>
-          <option>12th Grade</option>
+          <optgroup label="High school">
+            <option>9th Grader</option>
+            <option>10th Grader</option>
+            <option>11th Grader</option>
+            <option>12th Grader</option>
+          </optgroup>
+          <optgroup label="College">
+            <option>College Freshman</option>
+            <option>College Sophomore</option>
+            <option>College Junior</option>
+            <option>College Senior</option>
+          </optgroup>
         </select>
       </div>
 

@@ -67,9 +67,16 @@ model User {
   sendCount     Int      @default(0)
   sendCountDate DateTime?
 
-  // Daily rate limit for the AI prompt generator (each call costs money)
+  // Daily rate limit for the AI prompt generator (free API, but still
+  // rate-limited/shared, so worth capping)
   promptGenCount     Int      @default(0)
   promptGenCountDate DateTime?
+
+  // Daily rate limit for AI-grounded drafting, separate from the prompt
+  // generator's budget above since it's a per-professor action a student
+  // may reasonably want to use more than a few times a day
+  aiDraftCount     Int      @default(0)
+  aiDraftCountDate DateTime?
 
   accounts   Account[]
   sessions   Session[]

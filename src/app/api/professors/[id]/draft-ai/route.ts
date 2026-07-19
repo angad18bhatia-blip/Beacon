@@ -1,27 +1,50 @@
 import { NextResponse } from "next/server";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
-import { anthropic, CLAUDE_MODEL } from "@/lib/anthropic";
 import { exaSearch } from "@/lib/exa";
+import { nvidiaChat } from "@/lib/nvidia";
+import { extractJson } from "@/lib/extract-json";
+import { getCapabilityNote } from "@/lib/template";
 
+const NEMOTRON_MODEL = "nvidia/llama-3.3-nemotron-super-49b-v1";
 const DAILY_LIMIT = 10;
 
-function extractJson(text: string): { subject?: string; body?: string } {
-  const fenced = text.match(/```(?:json)?\s*([\s\S]*?)```/);
-  const candidate = fenced ? fenced[1] : text;
-  const objectMatch = candidate.match(/\{[\s\S]*\}/);
-  if (!objectMatch) return {};
-  try {
-    return JSON.parse(objectMatch[0]);
-  } catch {
-    return {};
-  }
+function buildPrompt(opts: {
+  professorName: string;
+  professorSchool: string;
+  professorDepartment: string | null;
+  context: string;
+  studentName: string;
+  studentSchool: string;
+  areaOfStudy: string;
+  degreeLevel: string;
+  bio: string;
+  templateSubject: string;
+  templateBody: string;
+}) {
+  return `Write a cold-outreach email from a student to a professor about research opportunities.
+
+Use ONLY the verified information below about the professor's research — never invent specifics that aren't present in it. If it doesn't give you enough to say something concrete and true, write a warmer, more general email instead of guessing at specifics.
+
+PROFESSOR: ${opts.professorName}${opts.professorDepartment ? `, ${opts.professorDepartment}` : ""} at ${opts.professorSchool}
+
+VERIFIED CONTEXT ABOUT THEIR RESEARCH:
+${opts.context || "(none found)"}
+
+STUDENT (sign the email with this exact name, do not invent a different one): ${opts.studentName || "the student"}, ${opts.degreeLevel} at ${opts.studentSchool}, interested in ${opts.areaOfStudy}.
+${opts.bio ? `Student bio: ${opts.bio}` : ""}
+
+What to ask for, based on the student's level — match this sentiment rather than a generic "shadowing" ask: ${getCapabilityNote(opts.degreeLevel)}
+
+Match the tone/style of this saved template (for reference only — write fresh wording, don't copy it verbatim):
+Subject: ${opts.templateSubject}
+Body: ${opts.templateBody}
+
+Format the body as a real email, not one run-on paragraph: a one-line greeting ("Dear Professor X,"), one or two short body paragraphs, then a sign-off on its own line ("Best regards," followed by the student's name on the next line) — separate each of these with a blank line (a literal \\n\\n between them in the JSON string value), the same way the template above is broken into lines.
+
+Write the actual final email with real values plugged in directly — no {{merge field}} placeholders, no bracketed instructions left in, no placeholder names. Respond with ONLY a JSON object: {"subject": "...", "body": "..."}. No commentary before or after it, and don't offer a second version.`;
 }
 
-// Generates a draft grounded in the professor's actual, real research
-// (via an Exa web search) rather than only merge-field substitution.
-// Costs an Exa search + a Claude call, so it shares the same daily
-// budget as the plain prompt generator.
 export async function POST(
   req: Request,
   { params }: { params: Promise<{ id: string }> },
@@ -39,7 +62,7 @@ export async function POST(
     prisma.user.findUnique({ where: { id: session.user.id } }),
   ]);
 
-  if (!professor || professor.userId !== session.user.id || !user) {
+  if (!professor || professor.userId !== session.user.id) {
     return NextResponse.json({ error: "Not found" }, { status: 404 });
   }
   if (professor.status === "SENT") {
@@ -48,30 +71,8 @@ export async function POST(
       { status: 409 },
     );
   }
-
-  const today = new Date().toDateString();
-  const lastDay = user.promptGenCountDate
-    ? new Date(user.promptGenCountDate).toDateString()
-    : null;
-  const countToday = lastDay === today ? user.promptGenCount : 0;
-
-  if (countToday >= DAILY_LIMIT) {
-    return NextResponse.json(
-      {
-        error: `You've hit today's limit of ${DAILY_LIMIT} AI generations. Please try again tomorrow, or use "Generate draft" instead.`,
-      },
-      { status: 429 },
-    );
-  }
-
-  if (!process.env.ANTHROPIC_API_KEY || !process.env.EXA_API_KEY) {
-    return NextResponse.json(
-      {
-        error:
-          "AI-grounded drafts aren't configured on this server yet (missing ANTHROPIC_API_KEY or EXA_API_KEY)",
-      },
-      { status: 500 },
-    );
+  if (!user) {
+    return NextResponse.json({ error: "Complete onboarding first" }, { status: 400 });
   }
 
   const template = templateId
@@ -87,52 +88,102 @@ export async function POST(
     );
   }
 
-  let searchResults;
-  try {
-    searchResults = await exaSearch(
-      `${professor.name} ${professor.school} ${professor.researchArea ?? ""} research`,
-      { numResults: 4 },
-    );
-  } catch (err) {
-    console.error("Exa search failed", err);
+  const today = new Date().toDateString();
+  const lastDay = user.aiDraftCountDate
+    ? new Date(user.aiDraftCountDate).toDateString()
+    : null;
+  const countToday = lastDay === today ? user.aiDraftCount : 0;
+
+  if (countToday >= DAILY_LIMIT) {
     return NextResponse.json(
-      { error: err instanceof Error ? err.message : "Search failed" },
-      { status: 502 },
+      {
+        error: `You've hit today's limit of ${DAILY_LIMIT} AI-grounded drafts. Please try again tomorrow.`,
+      },
+      { status: 429 },
     );
   }
 
-  const sourcesBlock = searchResults
-    .map((r, i) => `[${i + 1}] ${r.title ?? r.url}\n${r.url}\n${r.text}`)
-    .join("\n\n");
+  if (!process.env.NVIDIA_NEMOTRON_API_KEY) {
+    return NextResponse.json(
+      { error: "AI-grounded drafting isn't configured on this server yet (missing NVIDIA_NEMOTRON_API_KEY)" },
+      { status: 500 },
+    );
+  }
 
-  const prompt = `Write a personalized cold-outreach email from a high school student to a professor, based on the student's saved template style below, but grounded in the real search results about the professor's actual research provided below. Reference something SPECIFIC and REAL from the search results (a project, paper, or theme) — do not invent anything not supported by the sources. If the sources don't clearly support any specific detail, keep the email more general rather than making something up.
+  // Prefer whatever Discover's database already knows about this professor
+  // — free, instant, no live call. Only fall back to a live Exa search if
+  // there's nothing usable on file (not imported from Discover, or the
+  // entry has no research summary/projects).
+  let context = "";
+  let sources: string[] = [];
 
-STUDENT'S TEMPLATE STYLE (subject and body, follow this tone/structure, and keep the same placeholder tokens like {{professor_name}} for anything that isn't professor-specific research content):
-Subject: ${template.subject}
-Body:
-${template.body}
+  if (professor.importedFromDbId) {
+    const dbEntry = await prisma.researcherDatabase.findUnique({
+      where: { id: professor.importedFromDbId },
+    });
+    if (dbEntry && (dbEntry.researchSummary || dbEntry.recentProjects)) {
+      context = [dbEntry.researchSummary, dbEntry.recentProjects]
+        .filter(Boolean)
+        .join("\n\n");
+      sources = [
+        dbEntry.facultyWebsite,
+        dbEntry.labWebsite,
+        ...(dbEntry.verificationSources?.split("\n") ?? []),
+      ].filter((s): s is string => Boolean(s && s.trim()));
+    }
+  }
 
-STUDENT: ${user.name}, ${user.degreeLevel ?? "student"} at ${user.school ?? ""}, interested in ${user.areaOfStudy ?? ""}. Bio: ${user.bio ?? ""}
+  if (!context) {
+    if (!process.env.EXA_API_KEY) {
+      return NextResponse.json(
+        {
+          error:
+            "Nothing on file for this professor in Discover, and live web search isn't configured (missing EXA_API_KEY).",
+        },
+        { status: 500 },
+      );
+    }
+    try {
+      const results = await exaSearch(
+        `${professor.name} ${professor.school} research`,
+        { numResults: 5 },
+      );
+      context = results.map((r) => `${r.title ?? r.url}\n${r.text}`).join("\n\n");
+      sources = results.map((r) => r.url);
+    } catch (err) {
+      console.error("Exa search failed for AI-grounded draft", err);
+      return NextResponse.json(
+        { error: "Couldn't search the web for this professor right now. Please try again." },
+        { status: 502 },
+      );
+    }
+  }
 
-PROFESSOR: ${professor.name} at ${professor.school}${professor.department ? `, ${professor.department}` : ""}. Listed research area: ${professor.researchArea ?? "unknown"}.
-
-SEARCH RESULTS ABOUT THIS PROFESSOR:
-${sourcesBlock || "(no results found)"}
-
-Respond with ONLY a fenced JSON code block: {"subject": "...", "body": "..."}. The body should be a complete, ready-to-send email (no unresolved placeholder tokens except {{professor_name}}/{{student_name}} style ones if truly unavoidable). No other text.`;
+  const prompt = buildPrompt({
+    professorName: professor.name,
+    professorSchool: professor.school,
+    professorDepartment: professor.department,
+    context,
+    studentName: user.name || "",
+    studentSchool: user.school || "",
+    areaOfStudy: user.areaOfStudy || "",
+    degreeLevel: (user.degreeLevel || "").toLowerCase(),
+    bio: user.bio || "",
+    templateSubject: template.subject,
+    templateBody: template.body,
+  });
 
   let responseText = "";
   try {
-    const message = await anthropic.messages.create({
-      model: CLAUDE_MODEL,
-      max_tokens: 1200,
-      messages: [{ role: "user", content: prompt }],
+    responseText = await nvidiaChat({
+      apiKey: process.env.NVIDIA_NEMOTRON_API_KEY,
+      model: NEMOTRON_MODEL,
+      systemPrompt: "detailed thinking off",
+      prompt,
+      maxTokens: 1200,
     });
-    responseText = message.content
-      .map((block) => (block.type === "text" ? block.text : ""))
-      .join("\n");
   } catch (err) {
-    console.error("AI draft generation failed", err);
+    console.error("AI-grounded draft generation failed", err);
     return NextResponse.json(
       {
         error:
@@ -142,16 +193,23 @@ Respond with ONLY a fenced JSON code block: {"subject": "...", "body": "..."}. T
     );
   }
 
-  const { subject, body } = extractJson(responseText);
+  const parsed = extractJson(responseText) as
+    | { subject?: string; body?: string }
+    | null;
+  const subject = parsed?.subject;
+  const body = parsed?.body;
   if (!subject || !body) {
     return NextResponse.json(
-      { error: "Couldn't generate a usable draft. Please try again." },
+      {
+        error:
+          "Couldn't generate a usable draft. Please try again, or use the regular template instead.",
+      },
       { status: 502 },
     );
   }
 
-  const [updated] = await prisma.$transaction([
-    prisma.professor.update({
+  try {
+    const updated = await prisma.professor.update({
       where: { id },
       data: {
         draftSubject: subject,
@@ -159,12 +217,19 @@ Respond with ONLY a fenced JSON code block: {"subject": "...", "body": "..."}. T
         status: "DRAFTED",
         templateNameUsed: `${template.name} (AI-grounded)`,
       },
-    }),
-    prisma.user.update({
-      where: { id: user.id },
-      data: { promptGenCount: countToday + 1, promptGenCountDate: new Date() },
-    }),
-  ]);
+    });
 
-  return NextResponse.json({ professor: updated, sources: searchResults.map((r) => r.url) });
+    await prisma.user.update({
+      where: { id: user.id },
+      data: { aiDraftCount: countToday + 1, aiDraftCountDate: new Date() },
+    });
+
+    return NextResponse.json({ professor: updated, sources: [...new Set(sources)] });
+  } catch (err) {
+    console.error("Failed to save AI-grounded draft", err);
+    return NextResponse.json(
+      { error: "Generated a draft but couldn't save it. Please try again." },
+      { status: 500 },
+    );
+  }
 }

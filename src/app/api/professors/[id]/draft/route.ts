@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
-import { renderTemplate } from "@/lib/template";
+import { renderTemplate, getCapabilityNote } from "@/lib/template";
 
 export async function POST(
   req: Request,
@@ -52,6 +52,7 @@ export async function POST(
     area_of_study: user.areaOfStudy || "",
     degree_level: (user.degreeLevel || "").toLowerCase(),
     bio: user.bio || "",
+    capability_note: getCapabilityNote(user.degreeLevel || ""),
   };
 
   const draftSubject = renderTemplate(template.subject, fields);

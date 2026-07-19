@@ -16,7 +16,7 @@ const geistMono = Geist_Mono({
 export const metadata: Metadata = {
   title: "Beacon",
   description:
-    "Reach out to professors about research opportunities as a high schooler, one honest email at a time.",
+    "Reach out to professors about research opportunities as a student, one honest email at a time.",
 };
 
 export default function RootLayout({

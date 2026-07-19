@@ -58,9 +58,9 @@ export default async function SettingsPage() {
           Generate a prompt with AI
         </h2>
         <p className="mt-1 text-sm text-zinc-600 dark:text-zinc-400">
-          Describe the tone or angle you want and Claude will draft a new
-          saved prompt for you to review below &mdash; it&apos;s never used
-          to email anyone automatically.
+          Describe the tone or angle you want and AI will draft a new saved
+          prompt for you to review below &mdash; it&apos;s never used to
+          email anyone automatically.
         </p>
         <div className="mt-4">
           <PromptGenerator />

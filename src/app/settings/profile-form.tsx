@@ -17,7 +17,7 @@ export function ProfileForm({
   const router = useRouter();
   const [school, setSchool] = useState(initialSchool);
   const [degreeLevel, setDegreeLevel] = useState(
-    initialDegreeLevel || "9th Grade",
+    initialDegreeLevel || "9th Grader",
   );
   const [areaOfStudy, setAreaOfStudy] = useState(initialAreaOfStudy);
   const [bio, setBio] = useState(initialBio);
@@ -49,7 +49,7 @@ export function ProfileForm({
   return (
     <form onSubmit={handleSubmit} className="flex flex-col gap-4">
       <div>
-        <label className="block text-sm font-medium">Your high school</label>
+        <label className="block text-sm font-medium">Your school</label>
         <input
           required
           value={school}
@@ -62,7 +62,7 @@ export function ProfileForm({
       </div>
 
       <div>
-        <label className="block text-sm font-medium">Grade level</label>
+        <label className="block text-sm font-medium">Grade / year level</label>
         <select
           value={degreeLevel}
           onChange={(e) => {
@@ -71,10 +71,18 @@ export function ProfileForm({
           }}
           className="mt-1 w-full rounded-md border border-zinc-300 bg-white px-3 py-2 text-sm focus:border-accent focus:outline-none dark:border-zinc-700 dark:bg-zinc-900"
         >
-          <option>9th Grade</option>
-          <option>10th Grade</option>
-          <option>11th Grade</option>
-          <option>12th Grade</option>
+          <optgroup label="High school">
+            <option>9th Grader</option>
+            <option>10th Grader</option>
+            <option>11th Grader</option>
+            <option>12th Grader</option>
+          </optgroup>
+          <optgroup label="College">
+            <option>College Freshman</option>
+            <option>College Sophomore</option>
+            <option>College Junior</option>
+            <option>College Senior</option>
+          </optgroup>
         </select>
       </div>
 

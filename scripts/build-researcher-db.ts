@@ -1,21 +1,27 @@
 // Batch-builds the shared ResearcherDatabase table: for each
 // {university, department} pair below, searches the real web via Exa,
-// then asks Claude to extract only what's actually verifiable from those
+// then asks a free NVIDIA-hosted model (Llama 3.3 Nemotron Super 49B, via
+// build.nvidia.com) to extract only what's actually verifiable from those
 // search results (never guess, never fabricate, mark UNKNOWN otherwise),
 // and upserts the result. No manual "next" needed — it's just a loop.
 //
 // Run with:  npm run db:build-researchers
 //
 // PILOT SCOPE: this list is intentionally small (a handful of
-// department jobs) so a first run costs a few dollars, not $100+.
-// Once you've checked the output quality/cost yourself, add more
-// {university, department} pairs and re-run — already-saved researchers
-// are skipped, so it's safe to re-run with a longer list.
+// department jobs) — NVIDIA's free tier is rate-limited (not billed), so
+// there's no dollar cost, but a huge list could still burn through the
+// per-minute request quota. Once you've checked the output quality
+// yourself, add more {university, department} pairs and re-run —
+// already-saved researchers are skipped, so it's safe to re-run with a
+// longer list.
 
 import "dotenv/config";
 import { PrismaClient } from "../src/generated/prisma/client";
 import { exaSearch } from "../src/lib/exa";
-import { anthropic, CLAUDE_MODEL } from "../src/lib/anthropic";
+import { nvidiaChat } from "../src/lib/nvidia";
+import { extractJson } from "../src/lib/extract-json";
+
+const NEMOTRON_MODEL = "nvidia/llama-3.3-nemotron-super-49b-v1";
 
 const prisma = new PrismaClient();
 
@@ -24,6 +30,17 @@ const JOBS: { university: string; department: string }[] = [
   { university: "Massachusetts Institute of Technology", department: "Department of Biology" },
   { university: "Stanford University", department: "Department of Computer Science" },
   { university: "Stanford University", department: "Department of Biology" },
+  // Spread across more fields/universities so Discover isn't just CS + Biology
+  { university: "Massachusetts Institute of Technology", department: "Department of Physics" },
+  { university: "Stanford University", department: "Department of Chemistry" },
+  { university: "UC Berkeley", department: "Department of Physics" },
+  { university: "Princeton University", department: "Department of Mathematics" },
+  { university: "Harvard University", department: "Department of Psychology" },
+  { university: "California Institute of Technology", department: "Division of Chemistry and Chemical Engineering" },
+  { university: "University of Michigan", department: "Department of Aerospace Engineering" },
+  { university: "Georgia Institute of Technology", department: "School of Chemical and Biomolecular Engineering" },
+  { university: "Cornell University", department: "Department of Astronomy" },
+  { university: "UCLA", department: "Department of Neuroscience" },
 ];
 
 type Researcher = {
@@ -77,16 +94,8 @@ No other text outside the JSON code block.`;
 }
 
 function extractJsonArray(text: string): unknown[] {
-  const fenced = text.match(/```(?:json)?\s*([\s\S]*?)```/);
-  const candidate = fenced ? fenced[1] : text;
-  const arrayMatch = candidate.match(/\[[\s\S]*\]/);
-  if (!arrayMatch) return [];
-  try {
-    const parsed = JSON.parse(arrayMatch[0]);
-    return Array.isArray(parsed) ? parsed : [];
-  } catch {
-    return [];
-  }
+  const parsed = extractJson(text);
+  return Array.isArray(parsed) ? parsed : [];
 }
 
 function toResearcher(raw: unknown, university: string, department: string): Researcher | null {
@@ -115,12 +124,13 @@ async function processDepartment(university: string, department: string) {
   });
   console.log(`  found ${sources.length} web sources`);
 
-  const message = await anthropic.messages.create({
-    model: CLAUDE_MODEL,
-    max_tokens: 2000,
-    messages: [{ role: "user", content: buildPrompt(university, department, sources) }],
+  const text = await nvidiaChat({
+    apiKey: process.env.NVIDIA_NEMOTRON_API_KEY!,
+    model: NEMOTRON_MODEL,
+    systemPrompt: "detailed thinking off",
+    prompt: buildPrompt(university, department, sources),
+    maxTokens: 2000,
   });
-  const text = message.content.map((b) => (b.type === "text" ? b.text : "")).join("\n");
 
   const researchers = extractJsonArray(text)
     .map((r) => toResearcher(r, university, department))
@@ -142,8 +152,8 @@ async function processDepartment(university: string, department: string) {
 }
 
 async function main() {
-  if (!process.env.ANTHROPIC_API_KEY || !process.env.EXA_API_KEY) {
-    console.error("Set ANTHROPIC_API_KEY and EXA_API_KEY in .env before running this.");
+  if (!process.env.NVIDIA_NEMOTRON_API_KEY || !process.env.EXA_API_KEY) {
+    console.error("Set NVIDIA_NEMOTRON_API_KEY and EXA_API_KEY in .env before running this.");
     process.exit(1);
   }
 

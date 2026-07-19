@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import type { EmailTemplateModel } from "@/generated/prisma/models";
 
 const MERGE_FIELDS =
-  "{{professor_name}} {{professor_school}} {{research_area}} {{student_name}} {{student_school}} {{area_of_study}} {{degree_level}} {{bio}}";
+  "{{professor_name}} {{professor_school}} {{research_area}} {{student_name}} {{student_school}} {{area_of_study}} {{degree_level}} {{bio}} {{capability_note}}";
 
 function TemplateEditor({
   template,

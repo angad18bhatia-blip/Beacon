@@ -1,21 +1,11 @@
 import { NextResponse } from "next/server";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
-import { anthropic, CLAUDE_MODEL } from "@/lib/anthropic";
+import { nvidiaChat } from "@/lib/nvidia";
+import { extractJson } from "@/lib/extract-json";
 
-const DAILY_LIMIT = 10;
-
-function extractJson(text: string): { subject?: string; body?: string } {
-  const fenced = text.match(/```(?:json)?\s*([\s\S]*?)```/);
-  const candidate = fenced ? fenced[1] : text;
-  const objectMatch = candidate.match(/\{[\s\S]*\}/);
-  if (!objectMatch) return {};
-  try {
-    return JSON.parse(objectMatch[0]);
-  } catch {
-    return {};
-  }
-}
+const LLAMA_MODEL = "meta/llama-3.1-8b-instruct";
+const DAILY_LIMIT = 3;
 
 export async function POST(req: Request) {
   const session = await auth();
@@ -53,34 +43,34 @@ export async function POST(req: Request) {
     );
   }
 
-  if (!process.env.ANTHROPIC_API_KEY) {
+  if (!process.env.NVIDIA_LLAMA_API_KEY) {
     return NextResponse.json(
-      { error: "The prompt generator isn't configured on this server yet (missing ANTHROPIC_API_KEY)" },
+      { error: "The prompt generator isn't configured on this server yet (missing NVIDIA_LLAMA_API_KEY)" },
       { status: 500 },
     );
   }
 
-  const prompt = `Write a cold-outreach email template a high school student can send to a professor about research opportunities, based on this request from the student:
+  const prompt = `Write a cold-outreach email template a student (high school or college) can send to a professor about research opportunities, based on this request from the student:
 
 "${instruction}"
 
-Student context: ${user.degreeLevel ?? "a high school"} student at ${user.school ?? "their school"}, interested in ${user.areaOfStudy ?? "their field of interest"}.
+Student context: ${user.degreeLevel ?? "a student"} at ${user.school ?? "their school"}, interested in ${user.areaOfStudy ?? "their field of interest"}.
 
 The template must use these exact placeholder tokens (curly braces, verbatim) wherever the corresponding info belongs, since another program fills them in later — do not invent different placeholder names:
-{{professor_name}} {{professor_school}} {{research_area}} {{student_name}} {{student_school}} {{area_of_study}} {{degree_level}} {{bio}}
+{{professor_name}} {{professor_school}} {{research_area}} {{student_name}} {{student_school}} {{area_of_study}} {{degree_level}} {{bio}} {{capability_note}}
+
+{{capability_note}} is a pre-written sentence that already adapts itself to whether the student is in high school or college (asking for shadowing/small involvement vs. asking about research assistant positions directly) — use it for that part of the email instead of writing your own version of that ask.
 
 Respond with ONLY a fenced JSON code block: {"subject": "...", "body": "..."}. No other text.`;
 
   let responseText = "";
   try {
-    const message = await anthropic.messages.create({
-      model: CLAUDE_MODEL,
-      max_tokens: 1000,
-      messages: [{ role: "user", content: prompt }],
+    responseText = await nvidiaChat({
+      apiKey: process.env.NVIDIA_LLAMA_API_KEY,
+      model: LLAMA_MODEL,
+      prompt,
+      maxTokens: 1000,
     });
-    responseText = message.content
-      .map((block) => (block.type === "text" ? block.text : ""))
-      .join("\n");
   } catch (err) {
     console.error("Prompt generation failed", err);
     return NextResponse.json(
@@ -92,7 +82,11 @@ Respond with ONLY a fenced JSON code block: {"subject": "...", "body": "..."}. N
     );
   }
 
-  const { subject, body } = extractJson(responseText);
+  const parsed = extractJson(responseText) as
+    | { subject?: string; body?: string }
+    | null;
+  const subject = parsed?.subject;
+  const body = parsed?.body;
   if (!subject || !body) {
     return NextResponse.json(
       { error: "Couldn't generate a usable template. Please try rephrasing." },

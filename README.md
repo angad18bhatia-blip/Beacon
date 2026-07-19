@@ -1,7 +1,7 @@
 # Beacon
 
-A tool for high school students to reach out to professors about research
-opportunities and mentorship: add the professors you want to contact,
+A tool for high school and college students to reach out to professors
+about research opportunities and mentorship: add the professors you want to contact,
 generate a personalized draft for each one from your own profile,
 review/edit it yourself, then send it from your own Gmail account — one
 email per professor, always reviewed before it goes out, never a mass
@@ -33,31 +33,38 @@ blast.
   database itself is populated offline, once, by
   `scripts/build-researcher-db.ts` (`npm run db:build-researchers`),
   which loops over a list of `{university, department}` pairs, does a
-  real Exa web search for each, and asks Claude to extract *only* what's
-  verifiable from those search results (never fabricated, marked
-  `UNKNOWN`/`null` otherwise). Edit the `JOBS` list at the top of that
-  script to control scope — it's intentionally small by default so a
-  first run costs a few dollars, not $100+; already-saved researchers are
-  skipped on re-runs, so it's safe to extend the list and re-run later.
-  Even so, this is AI-assembled data, not hand-verified — the UI reminds
-  you to double-check before contacting anyone.
+  real Exa web search for each, and asks a free NVIDIA-hosted model
+  (Llama 3.3 Nemotron Super 49B, via [build.nvidia.com](https://build.nvidia.com/))
+  to extract *only* what's verifiable from those search results (never
+  fabricated, marked `UNKNOWN`/`null` otherwise). Edit the `JOBS` list at
+  the top of that script to control scope — NVIDIA's free tier is
+  rate-limited rather than billed, so there's no dollar cost, but a huge
+  list could still burn through the per-minute request quota; already-saved
+  researchers are skipped on re-runs, so it's safe to extend the list and
+  re-run later. Even so, this is AI-assembled data, not hand-verified —
+  the UI reminds you to double-check before contacting anyone.
 - **Saved prompts** (Settings) — keep multiple templates, mark one
   active, or pick a specific one per professor when generating a draft.
 - **Prompt generator** (Settings) — describe what you want in plain
-  English and Claude drafts a new saved prompt for you to review before
-  saving. Rate-limited (10/day/user) since each call costs money.
-- **"Ground with real research" drafts** (professor detail page) — instead
-  of plain template merge-fields, does a live Exa search on that specific
-  professor and asks Claude to write a draft referencing something real
-  from the results, with source links shown so you can verify them.
-  Shares the same 10/day budget as the prompt generator.
+  English and a free NVIDIA-hosted model (Llama 3.1 8B Instruct) drafts a
+  new saved prompt for you to review before saving. Rate-limited
+  (3/day/user) to stay well within NVIDIA's shared free-tier quota.
+- **"Ground with real research" drafts** (professor detail page) — writes
+  a finished email instead of filling a template, using real research
+  context: whatever Discover's database already has on that professor if
+  they were imported from there, or a live Exa search otherwise. Either
+  way, a free NVIDIA-hosted model (Llama 3.3 Nemotron Super 49B) writes
+  the draft and returns the source links it used so you can verify them.
+  Rate-limited (10/day/user), tracked separately from the prompt
+  generator's limit.
 - **Reply detection** — "Check for reply" (per professor) or "Check for
   replies" (dashboard, bulk) reads the Gmail thread the app sent and
   reports whether the professor has responded, with a snippet. On-demand
   only (no background job/cron in this app).
-- **Stats** page — reply rate per saved prompt, and an overall funnel
-  (New → Drafted → Approved → Sent → Replied). Small sample sizes will be
-  noisy; it's a signal, not a verdict.
+- **Dashboard** — a New → Drafted → Approved → Sent → Replied funnel (each
+  tile links to that filtered slice of your professor list), reply rate
+  per saved prompt, and the send actions themselves. Small sample sizes
+  will be noisy; it's a signal, not a verdict.
 
 ## Local setup
 
@@ -95,17 +102,19 @@ Copy `.env.example` to `.env` (a starter `.env` with the right shape
 already exists) and fill in:
 
 ```bash
-AUTH_SECRET=        # generate with: npx auth secret
-AUTH_GOOGLE_ID=      # from step 2
-AUTH_GOOGLE_SECRET=  # from step 2
-ANTHROPIC_API_KEY=   # optional — from console.anthropic.com, enables prompt generator + AI-grounded drafts
-EXA_API_KEY=          # optional — from exa.ai, enables the Discover database builder script
+AUTH_SECRET=             # generate with: npx auth secret
+AUTH_GOOGLE_ID=           # from step 2
+AUTH_GOOGLE_SECRET=       # from step 2
+NVIDIA_LLAMA_API_KEY=      # optional — free key from build.nvidia.com, enables the prompt generator
+NVIDIA_NEMOTRON_API_KEY=   # optional — free key from build.nvidia.com, enables the Discover database builder script
+EXA_API_KEY=                # optional — from exa.ai, enables the Discover database builder script
 ```
 
 `DATABASE_URL` is already set to a local SQLite file — no extra setup
-needed for local dev. Set a spend limit on both API keys in their
-respective consoles — see "AI features" above for what each one powers
-and its rate limit.
+needed for local dev. The two NVIDIA keys are both free (no card, no
+spend limit to set) — see "AI features" above for what each one powers
+and its rate limit. Exa's free tier covers casual use of the Discover
+builder; check their pricing if you extend the `JOBS` list a lot.
 
 ### 4. Set up the database
 
@@ -203,8 +212,8 @@ file under `prisma/migrations/`) and push it.
    GitHub repo from step 1.
 2. Under **Environment Variables**, add: `DATABASE_URL` (the Neon
    connection string), `AUTH_SECRET`, `AUTH_GOOGLE_ID`, `AUTH_GOOGLE_SECRET`,
-   and `ANTHROPIC_API_KEY`/`EXA_API_KEY` if you're using the AI features
-   (same values as your local `.env`).
+   and `NVIDIA_LLAMA_API_KEY`/`NVIDIA_NEMOTRON_API_KEY`/`EXA_API_KEY` if
+   you're using the AI features (same values as your local `.env`).
 3. Deploy. Vercel gives you a URL like `https://your-app.vercel.app`.
 
 ### 5. Point Google's OAuth client at the production URL

@@ -71,16 +71,21 @@ export function PromptGenerator() {
           placeholder="e.g. Make it shorter and more casual, and mention I'm on the robotics team"
           className="w-full rounded-md border border-zinc-300 bg-white px-3 py-2 text-sm focus:border-accent focus:outline-none dark:border-zinc-700 dark:bg-zinc-900"
         />
-        <button
-          type="submit"
-          disabled={generating || !instruction.trim()}
-          className="self-start rounded-full px-5 py-2.5 text-sm font-medium text-white disabled:opacity-50"
-          style={{
-            backgroundImage: "linear-gradient(90deg, var(--accent), var(--accent2))",
-          }}
-        >
-          {generating ? "Generating…" : "Generate prompt"}
-        </button>
+        <div className="flex items-center gap-3">
+          <button
+            type="submit"
+            disabled={generating || !instruction.trim()}
+            className="self-start rounded-full px-5 py-2.5 text-sm font-medium text-white disabled:opacity-50"
+            style={{
+              backgroundImage: "linear-gradient(90deg, var(--accent), var(--accent2))",
+            }}
+          >
+            {generating ? "Generating…" : "Generate prompt"}
+          </button>
+          <span className="text-xs text-zinc-500">
+            Limited to 3 generations per day.
+          </span>
+        </div>
       </form>
 
       {error && <p className="text-sm text-danger">{error}</p>}

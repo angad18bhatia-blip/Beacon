@@ -1,47 +1,30 @@
 import { redirect } from "next/navigation";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
+import { discoverWhere, DISCOVER_PAGE_SIZE } from "@/lib/discover-search";
 import { DiscoverResults } from "./discover-results";
 
 export default async function DiscoverPage({
   searchParams,
 }: {
-  searchParams: Promise<{ q?: string; university?: string; department?: string }>;
+  searchParams: Promise<{ q?: string }>;
 }) {
   const session = await auth();
   if (!session?.user) redirect("/");
   if (!session.user.onboarded) redirect("/onboarding");
 
-  const { q, university, department } = await searchParams;
+  const { q } = await searchParams;
+  const query = q ?? "";
+  const hasQuery = Boolean(query.trim());
+  const where = discoverWhere(query);
 
-  const hasQuery = Boolean(q?.trim() || university?.trim() || department?.trim());
-
-  const [results, totalCount] = await Promise.all([
-    hasQuery
-      ? prisma.researcherDatabase.findMany({
-          where: {
-            AND: [
-              q?.trim()
-                ? {
-                    OR: [
-                      { name: { contains: q.trim() } },
-                      { fieldOfResearch: { contains: q.trim() } },
-                      { researchSummary: { contains: q.trim() } },
-                    ],
-                  }
-                : {},
-              university?.trim()
-                ? { university: { contains: university.trim() } }
-                : {},
-              department?.trim()
-                ? { department: { contains: department.trim() } }
-                : {},
-            ],
-          },
-          orderBy: { name: "asc" },
-          take: 30,
-        })
-      : Promise.resolve([]),
+  const [results, matchingCount, totalCount] = await Promise.all([
+    prisma.researcherDatabase.findMany({
+      where,
+      orderBy: { name: "asc" },
+      take: DISCOVER_PAGE_SIZE,
+    }),
+    prisma.researcherDatabase.count({ where }),
     prisma.researcherDatabase.count(),
   ]);
 
@@ -71,28 +54,16 @@ export default async function DiscoverPage({
         </div>
       ) : (
         <>
-          <form className="mt-6 grid grid-cols-1 gap-3 sm:grid-cols-3">
+          <form className="mt-6 flex flex-col gap-3 sm:flex-row">
             <input
               name="q"
-              defaultValue={q}
-              placeholder="Search field or name"
-              className="rounded-md border border-zinc-300 bg-white px-3 py-2 text-sm focus:border-accent focus:outline-none dark:border-zinc-700 dark:bg-zinc-900"
-            />
-            <input
-              name="university"
-              defaultValue={university}
-              placeholder="University"
-              className="rounded-md border border-zinc-300 bg-white px-3 py-2 text-sm focus:border-accent focus:outline-none dark:border-zinc-700 dark:bg-zinc-900"
-            />
-            <input
-              name="department"
-              defaultValue={department}
-              placeholder="Department"
-              className="rounded-md border border-zinc-300 bg-white px-3 py-2 text-sm focus:border-accent focus:outline-none dark:border-zinc-700 dark:bg-zinc-900"
+              defaultValue={query}
+              placeholder="Search by name, university, department, or field of research"
+              className="flex-1 rounded-md border border-zinc-300 bg-white px-3 py-2 text-sm focus:border-accent focus:outline-none dark:border-zinc-700 dark:bg-zinc-900"
             />
             <button
               type="submit"
-              className="col-span-1 self-start rounded-full bg-accent px-5 py-2 text-sm font-medium text-white hover:bg-accent-hover sm:col-span-3"
+              className="self-start rounded-full bg-accent px-5 py-2 text-sm font-medium text-white hover:bg-accent-hover"
             >
               Search
             </button>
@@ -104,7 +75,11 @@ export default async function DiscoverPage({
                 No matches. Try a broader search.
               </p>
             )}
-            <DiscoverResults results={results} />
+            <DiscoverResults
+              initialResults={results}
+              totalMatching={matchingCount}
+              query={query}
+            />
           </div>
         </>
       )}
