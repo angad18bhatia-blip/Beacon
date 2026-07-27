@@ -2,9 +2,8 @@ import { redirect } from "next/navigation";
 import Link from "next/link";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
-import { StatusBadge } from "@/components/status-badge";
-import { Avatar } from "@/components/avatar";
 import { AddProfessorForm } from "./add-professor-form";
+import { ProfessorsList } from "./professors-list";
 
 const STATUS_LABELS = {
   NEW: "New",
@@ -67,52 +66,14 @@ export default async function ProfessorsPage({
 
       {!filterLabel && <AddProfessorForm />}
 
-      <ul className="mt-8 divide-y divide-zinc-200 dark:divide-zinc-800">
-        {professors.length === 0 && (
-          <li className="py-8 text-center text-sm text-zinc-500">
-            {filterLabel
-              ? `No professors match "${filterLabel}".`
-              : "No professors yet — add one above to get started."}
-          </li>
-        )}
-        {professors.map((p) => (
-          <li key={p.id} className="flex items-center gap-3 py-4">
-            <Avatar name={p.name} />
-            <div className="flex-1">
-              <Link
-                href={`/professors/${p.id}`}
-                className="font-medium hover:underline"
-              >
-                {p.name}
-              </Link>
-              <p className="text-sm text-zinc-500">
-                {p.school}
-                {p.department ? ` · ${p.department}` : ""}
-              </p>
-              {p.researchArea && (
-                <p className="text-xs text-zinc-400">{p.researchArea}</p>
-              )}
-            </div>
-            <div className="flex items-center gap-3">
-              {p.hasReply && (
-                <span
-                  className="rounded-full px-2 py-0.5 text-xs font-medium"
-                  style={{ background: "var(--accent2-soft)", color: "var(--accent2)" }}
-                >
-                  Replied
-                </span>
-              )}
-              <StatusBadge status={p.status} />
-              <Link
-                href={`/professors/${p.id}`}
-                className="text-sm font-medium text-zinc-600 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-white"
-              >
-                Open →
-              </Link>
-            </div>
-          </li>
-        ))}
-      </ul>
+      <ProfessorsList
+        professors={professors}
+        emptyMessage={
+          filterLabel
+            ? `No professors match "${filterLabel}".`
+            : "No professors yet — add one above to get started."
+        }
+      />
     </main>
   );
 }

@@ -43,6 +43,15 @@ export async function PATCH(
     "status",
   ] as const;
 
+  if (
+    "email" in body &&
+    typeof body.email === "string" &&
+    body.email.trim() &&
+    !body.email.includes("@")
+  ) {
+    return NextResponse.json({ error: "That doesn't look like a valid email" }, { status: 400 });
+  }
+
   const data: Record<string, unknown> = {};
   for (const key of allowed) {
     if (key in body) data[key] = body[key];

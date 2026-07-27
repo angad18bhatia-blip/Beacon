@@ -33,9 +33,9 @@ export async function POST(req: Request) {
     importedFromDbId,
   } = await req.json();
 
-  if (!name || !email || !school) {
+  if (!name || !school) {
     return NextResponse.json(
-      { error: "Name, email, and school are required" },
+      { error: "Name and school are required" },
       { status: 400 },
     );
   }
@@ -44,7 +44,7 @@ export async function POST(req: Request) {
     data: {
       userId: session.user.id,
       name,
-      email,
+      email: email || "",
       school,
       department: department || null,
       researchArea: researchArea || null,

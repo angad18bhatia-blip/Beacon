@@ -36,6 +36,14 @@ export async function sendProfessorEmail(
     };
   }
 
+  if (!professor.email) {
+    return {
+      ok: false,
+      error: "Add an email address for this professor before sending",
+      status: 400,
+    };
+  }
+
   const today = new Date().toDateString();
   const lastSendDay = user.sendCountDate
     ? new Date(user.sendCountDate).toDateString()

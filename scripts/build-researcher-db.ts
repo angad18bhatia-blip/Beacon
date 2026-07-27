@@ -41,6 +41,16 @@ const JOBS: { university: string; department: string }[] = [
   { university: "Georgia Institute of Technology", department: "School of Chemical and Biomolecular Engineering" },
   { university: "Cornell University", department: "Department of Astronomy" },
   { university: "UCLA", department: "Department of Neuroscience" },
+  { university: "Harvard University", department: "Department of Computer Science" },
+  { university: "Stanford University", department: "Department of Mechanical Engineering" },
+  { university: "Massachusetts Institute of Technology", department: "Department of Chemistry" },
+  { university: "UC Berkeley", department: "Department of Molecular and Cell Biology" },
+  { university: "Princeton University", department: "Department of Physics" },
+  { university: "Cornell University", department: "Department of Computer Science" },
+  { university: "University of Michigan", department: "Department of Chemistry" },
+  { university: "Georgia Institute of Technology", department: "School of Physics" },
+  { university: "UCLA", department: "Department of Chemistry and Biochemistry" },
+  { university: "California Institute of Technology", department: "Division of Geological and Planetary Sciences" },
 ];
 
 type Researcher = {
@@ -101,10 +111,14 @@ function extractJsonArray(text: string): unknown[] {
 function toResearcher(raw: unknown, university: string, department: string): Researcher | null {
   if (typeof raw !== "object" || raw === null) return null;
   const r = raw as Record<string, unknown>;
-  if (typeof r.name !== "string" || !r.name.trim()) return null;
-  const str = (v: unknown) => (typeof v === "string" && v.trim() ? v : null);
+  // The model sometimes writes the literal text "null"/"unknown" instead of
+  // a real JSON null for a missing field — treat that as absent too.
+  const isNullish = (v: unknown) =>
+    typeof v !== "string" || !v.trim() || ["null", "unknown", "n/a"].includes(v.trim().toLowerCase());
+  if (isNullish(r.name)) return null;
+  const str = (v: unknown) => (isNullish(v) ? null : (v as string));
   return {
-    name: r.name,
+    name: r.name as string,
     university,
     college: str(r.college),
     department,

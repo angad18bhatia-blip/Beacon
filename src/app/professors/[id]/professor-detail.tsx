@@ -32,6 +32,9 @@ export function ProfessorDetail({
   const [subject, setSubject] = useState(professor.draftSubject ?? "");
   const [body, setBody] = useState(professor.draftBody ?? "");
   const [status, setStatus] = useState(professor.status);
+  const [email, setEmail] = useState(professor.email);
+  const [emailDraft, setEmailDraft] = useState(professor.email);
+  const [emailError, setEmailError] = useState<string | null>(null);
   const [templateNameUsed, setTemplateNameUsed] = useState(
     professor.templateNameUsed,
   );
@@ -149,10 +152,28 @@ export function ProfessorDetail({
     router.refresh();
   }
 
+  async function saveEmail() {
+    setBusy("saving");
+    setEmailError(null);
+    const res = await fetch(`/api/professors/${professor.id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ email: emailDraft.trim() }),
+    });
+    const data = await parseJsonSafe(res);
+    if (!res.ok || !data.professor) {
+      setEmailError(data.error ?? "Failed to save email");
+      setBusy("idle");
+      return;
+    }
+    setEmail((data.professor as ProfessorModel).email);
+    setBusy("idle");
+  }
+
   async function sendEmail() {
     if (
       !confirm(
-        `Send this email to ${professor.name} <${professor.email}> from ${studentEmail}? This can't be undone.`,
+        `Send this email to ${professor.name} <${email}> from ${studentEmail}? This can't be undone.`,
       )
     ) {
       return;
@@ -207,7 +228,8 @@ export function ProfessorDetail({
               {professor.name}
             </h1>
             <p className="text-sm text-zinc-500">
-              {professor.email} · {professor.school}
+              {email ? `${email} · ` : ""}
+              {professor.school}
               {professor.department ? ` · ${professor.department}` : ""}
             </p>
             {professor.researchArea && (
@@ -219,6 +241,31 @@ export function ProfessorDetail({
         </div>
         <StatusBadge status={status} />
       </div>
+
+      {!email && !isSent && (
+        <div
+          className="mt-4 flex flex-wrap items-center gap-2 rounded-lg border p-4 text-sm"
+          style={{ borderColor: "var(--amber-soft)", background: "var(--amber-soft)" }}
+        >
+          <p className="w-full text-amber">
+            No email on file for {professor.name} yet — add one before you can send.
+          </p>
+          <input
+            value={emailDraft}
+            onChange={(e) => setEmailDraft(e.target.value)}
+            placeholder="professor@university.edu"
+            className="min-w-0 flex-1 rounded-md border border-zinc-300 bg-white px-3 py-2 text-sm focus:border-accent focus:outline-none dark:border-zinc-700 dark:bg-zinc-900"
+          />
+          <button
+            onClick={saveEmail}
+            disabled={busyAtAll || !emailDraft.trim()}
+            className="rounded-full bg-accent px-4 py-2 text-sm font-medium text-white hover:bg-accent-hover disabled:opacity-50"
+          >
+            {busy === "saving" ? "Saving…" : "Save email"}
+          </button>
+          {emailError && <p className="w-full text-danger">{emailError}</p>}
+        </div>
+      )}
 
       {isSent ? (
         <div
@@ -397,9 +444,13 @@ export function ProfessorDetail({
                 )}
                 <button
                   onClick={sendEmail}
-                  disabled={busyAtAll || isDirty}
+                  disabled={busyAtAll || isDirty || !email}
                   title={
-                    isDirty ? "Save your changes before sending" : undefined
+                    !email
+                      ? "Add an email address for this professor before sending"
+                      : isDirty
+                        ? "Save your changes before sending"
+                        : undefined
                   }
                   className="rounded-full bg-accent px-4 py-2 text-sm font-medium text-white hover:bg-accent-hover disabled:opacity-50"
                 >

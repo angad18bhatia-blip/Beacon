@@ -32,13 +32,12 @@ export function DiscoverResults({
     setImporting(true);
     const toImport = results.filter((r) => selected.has(r.id));
     for (const r of toImport) {
-      if (!r.email) continue;
       await fetch("/api/professors", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           name: r.name,
-          email: r.email,
+          email: r.email ?? "",
           school: r.university,
           department: r.department,
           researchArea: r.fieldOfResearch,
@@ -65,7 +64,7 @@ export function DiscoverResults({
 
   if (results.length === 0) return null;
 
-  const selectableCount = results.filter((r) => r.email && selected.has(r.id)).length;
+  const selectableCount = selected.size;
   const hasMore = results.length < totalMatching;
 
   return (
@@ -78,7 +77,6 @@ export function DiscoverResults({
           >
             <input
               type="checkbox"
-              disabled={!r.email}
               checked={selected.has(r.id)}
               onChange={() => toggle(r.id)}
               className="mt-1 h-4 w-4"
@@ -134,8 +132,8 @@ export function DiscoverResults({
                   r.email
                 ) : (
                   <span className="text-amber">
-                    No email found yet — try a quick search for their name to
-                    find one on their faculty page.
+                    No email found yet — you can still add them and fill one
+                    in later.
                   </span>
                 )}
               </p>
@@ -167,7 +165,7 @@ export function DiscoverResults({
       </ul>
 
       <div className="flex flex-wrap items-center gap-3">
-        {results.some((r) => r.email) && (
+        {results.length > 0 && (
           <button
             onClick={handleImport}
             disabled={selectableCount === 0 || importing}
