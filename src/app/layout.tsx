@@ -17,6 +17,9 @@ export const metadata: Metadata = {
   title: "Beacon",
   description:
     "Reach out to professors about research opportunities as a student, one honest email at a time.",
+  verification: {
+    google: "osmDCNNzN0e2Rei8FZe6HT9hdFocHj8FSFh3vRX2OoM",
+  },
 };
 
 export default function RootLayout({
