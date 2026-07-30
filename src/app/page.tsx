@@ -1,4 +1,5 @@
 import { redirect } from "next/navigation";
+import Link from "next/link";
 import { auth } from "@/auth";
 import { SignInButton } from "@/components/sign-in-button";
 
@@ -107,6 +108,15 @@ export default async function Home() {
           ))}
         </div>
       </div>
+
+      <footer className="mx-auto mt-24 flex gap-4 text-xs text-zinc-400 dark:text-zinc-600">
+        <Link href="/privacy" className="hover:underline">
+          Privacy Policy
+        </Link>
+        <Link href="/terms" className="hover:underline">
+          Terms of Service
+        </Link>
+      </footer>
     </main>
   );
 }
